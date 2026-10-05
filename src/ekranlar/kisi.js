@@ -3,6 +3,8 @@ import { durum } from '../durum.js';
 import { h, ikon, avatar, kapak, sayfaAc, toast, zamanOnce, titret } from '../ui.js';
 import { kitapKarti, bosDurum, ustBar } from './ortak.js';
 import { profilleriYukle, profilBilgisi } from './yildizlar.js';
+import { sikayetSayfasi, engelliMi, engelDegistir } from '../sikayet.js';
+import { sahipPuaniYaz } from './kitap.js';
 
 export function kisiEkrani(kok, { parca }) {
   const uid = parca[0];
@@ -25,6 +27,8 @@ export function kisiEkrani(kok, { parca }) {
         <div class="kisi-avatar">${avatar(ad, foto, 84)}</div>
         <h1>${h(ad)}</h1>
         <p>${sehir ? `${ikon('konum', 15)} ${h(sehir)}` : ''}</p>
+        <span class="sahip-puan" id="ks-puan"></span>
+        ${engelliMi(uid) ? `<div class="ipucu dikkat">${ikon('engel', 18)}<span>Bu okuru engelledin. Kitaplarını görmüyorsun ve senin kitaplarını isteyemez.</span></div>` : ''}
         <div class="istatistik kucuk">
           <div class="ist"><b>${rafta.length}</b><span>Rafında</span></div>
           <button class="ist dokunulur" id="ks-paylasti" aria-label="Gönderdiği kitapları gör"><b>${gonderilen.length}</b><span>Paylaştı ${ikon('sag', 12, 2.6)}</span></button>
@@ -32,7 +36,14 @@ export function kisiEkrani(kok, { parca }) {
       </section>
       <section class="bolum"><div class="bolum-bas"><h2>Rafındaki kitaplar</h2></div>
         ${rafta.length ? `<div class="izgara">${rafta.map((k) => kitapKarti(k)).join('')}</div>` : bosDurum('raf', 'Rafı şu an boş', 'Bu okurun paylaşacak kitabı kalmamış.')}
-      </section>` : bosDurum('kisi', 'Okur bulunamadı', '')}`;
+      </section>
+      ${uid !== durum.kullanici.uid ? `<div class="kisi-eylem">
+        <button class="bildir-bag" id="ks-bildir">${ikon('bildir', 14)}<span>Bildir</span></button>
+        <button class="bildir-bag" id="ks-engel">${ikon('engel', 14)}<span>${engelliMi(uid) ? 'Engeli kaldır' : 'Engelle'}</span></button>
+      </div>` : ''}` : bosDurum('kisi', 'Okur bulunamadı', '')}`;
+    sahipPuaniYaz(uid, kok.querySelector('#ks-puan'));
+    kok.querySelector('#ks-bildir')?.addEventListener('click', () => sikayetSayfasi('kisi', uid, ad));
+    kok.querySelector('#ks-engel')?.addEventListener('click', async () => { if (await engelDegistir(uid, ad)) ciz(); });
 
     kok.querySelector('#ks-paylasti')?.addEventListener('click', () => { titret(); gonderilenleriGoster(ad, gonderilen); });
   };

@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { api } from './veri/index.js';
-import { durum, degisti, abone } from './durum.js';
+import { durum, degisti, abone, kitaplariSuz } from './durum.js';
 import { ikon, $, titret, toast, hataMetni, ustSayfayiKapat } from './ui.js';
 import { git, geri, yiginiSifirla, tarayiciGeriGitti, rotalayiciAyarla } from './yon.js';
 import { App } from '@capacitor/app';
@@ -41,6 +41,7 @@ let aktif = null; // { ad, ekran örneği }
 let kitapAboneligi = null;
 let talepAboneligi = null;
 let yolculukAboneligi = null;
+let hesapAboneligi = null;
 
 function cozumle() {
   const [yol, sorgu = ''] = location.hash.replace(/^#\/?/, '').split('?');
@@ -125,12 +126,29 @@ function abonelikleriKapat() {
   kitapAboneligi?.(); kitapAboneligi = null;
   talepAboneligi?.(); talepAboneligi = null;
   yolculukAboneligi?.(); yolculukAboneligi = null;
+  hesapAboneligi?.(); hesapAboneligi = null;
+}
+
+// Kargodan 14 gün sonra itirazsız kalan gönderilerim teslim edilmiş sayılır (puanım yazılır)
+const GUN = 86400000;
+const otomatikDenenen = new Set();
+function suresiDolanlar(gelen) {
+  for (const t of gelen) {
+    if (t.durum !== 'kargoda' || t.sorun || !t.kargoTarihi || otomatikDenenen.has(t.id)) continue;
+    if (Date.now() - t.kargoTarihi < 14 * GUN + 60000) continue;
+    otomatikDenenen.add(t.id);
+    api.otomatikTeslim(t).catch(() => {});
+  }
 }
 
 function verileriDinle(uid) {
   const hata = (e) => toast(hataMetni(e), 'hata');
+  hesapAboneligi = api.hesabiDinle(uid, (h) => { durum.hesap = h; degisti('hesap'); });
+  api.hesapHazirla(uid).then((h) => { durum.hesap = h; degisti('hesap'); }).catch(() => {});
+  api.engelleriGetir(uid).then((l) => { durum.engel = new Set(l); kitaplariSuz(); degisti('kitaplar'); }).catch(() => {});
   kitapAboneligi = api.kitaplariDinle((liste) => {
-    durum.kitaplar = liste;
+    durum.tumKitaplar = liste;
+    kitaplariSuz();
     durum.kitaplarHazir = true;
     degisti('kitaplar');
   }, hata);
@@ -143,6 +161,7 @@ function verileriDinle(uid) {
     durum.gelen = gelen.sort(sirala);
     durum.giden = giden.sort(sirala);
     talepDegisti(gelen, giden);
+    suresiDolanlar(gelen);
     degisti('talepler');
   }, hata);
 }

@@ -35,7 +35,7 @@ const TOHUM = [
 ];
 
 let veri = yukle();
-const dinleyiciler = { oturum: new Set(), kitap: new Set(), talep: new Set(), yolculuk: new Set() };
+const dinleyiciler = { oturum: new Set(), kitap: new Set(), talep: new Set(), yolculuk: new Set(), hesap: new Set() };
 
 function yukle() {
   try {
@@ -91,6 +91,7 @@ function yayinla() {
   const kitaplar = [...veri.kitaplar].sort((a, b) => b.olusturma - a.olusturma);
   dinleyiciler.kitap.forEach((cb) => cb(kitaplar));
   dinleyiciler.yolculuk.forEach((cb) => cb([...veri.yolculuklar].sort((a, b) => b.tarih - a.tarih)));
+  dinleyiciler.hesap.forEach(({ uid, cb }) => cb({ ...hesap(uid) }));
   dinleyiciler.talep.forEach(({ uid, cb }) => cb({
     gelen: veri.talepler.filter((t) => t.sahipId === uid),
     giden: veri.talepler.filter((t) => t.isteyenId === uid),
@@ -256,6 +257,14 @@ function guncelle(id, alanlar) {
 
 export async function talepOlustur(kullanici, profil, kitap, not, adres) {
   await bekle(500);
+  const tel = telKimligi(adres.telefon);
+  if (!tel) throw { code: 'okudum/telefon-gecersiz' };
+  veri.telefonlar ||= {};
+  if (veri.telefonlar[tel] && veri.telefonlar[tel] !== kullanici.uid) throw { code: 'okudum/telefon-baska-hesapta' };
+  const hs = hesap(kullanici.uid);
+  if (hs.puan < 1) throw { code: 'okudum/puan-yok' };
+  veri.telefonlar[tel] = kullanici.uid;
+  hs.puan -= 1;
   const id = 't' + Date.now();
   veri.talepler.push({
     id, kitapId: kitap.id, kitapAd: kitap.ad, kitapYazar: kitap.yazar, kitapFoto: kitap.foto || '',
@@ -269,14 +278,14 @@ export async function talepOlustur(kullanici, profil, kitap, not, adres) {
   setTimeout(() => {
     const t = talepBul(id);
     if (t?.durum !== 'bekliyor') return;
-    guncelle(id, { durum: 'kabul' });
-    kitapBul(t.kitapId).durum = 'rezerve';
+    guncelle(id, { durum: 'kabul', kabulTarihi: Date.now() });
+    Object.assign(kitapBul(t.kitapId), { durum: 'rezerve', talepId: id });
     kaydet();
   }, 8000);
   setTimeout(() => {
     const t = talepBul(id);
     if (t?.durum !== 'kabul') return;
-    guncelle(id, { durum: 'kargoda', kargo: { firma: 'Yurtiçi Kargo', takipNo: String(Math.floor(1e11 + Math.random() * 9e11)) } });
+    guncelle(id, { durum: 'kargoda', kargoTarihi: Date.now(), kargo: { firma: 'Yurtiçi Kargo', takipNo: String(Math.floor(1e11 + Math.random() * 9e11)) } });
     kitapBul(t.kitapId).durum = 'verildi';
     kaydet();
   }, 20000);
@@ -286,22 +295,29 @@ export async function talepAdresi(id) { return veri.talepAdresleri[id] || null; 
 
 export async function talepKabul(talep, digerleri) {
   await bekle();
-  guncelle(talep.id, { durum: 'kabul' });
-  for (const t of digerleri) guncelle(t.id, { durum: 'red' });
-  kitapBul(talep.kitapId).durum = 'rezerve';
+  guncelle(talep.id, { durum: 'kabul', kabulTarihi: Date.now() });
+  for (const t of digerleri) { guncelle(t.id, { durum: 'red' }); hesap(t.isteyenId).puan += 1; }
+  Object.assign(kitapBul(talep.kitapId), { durum: 'rezerve', talepId: talep.id });
   kaydet();
 }
-export async function talepReddet(talep) { await bekle(); guncelle(talep.id, { durum: 'red' }); kaydet(); }
-export async function talepIptal(talep) { await bekle(); guncelle(talep.id, { durum: 'iptal' }); kaydet(); }
+export async function talepReddet(talep) { await bekle(); guncelle(talep.id, { durum: 'red' }); hesap(talep.isteyenId).puan += 1; kaydet(); }
+export async function talepIptal(talep) {
+  await bekle();
+  if (talep.durum === 'kabul') kitapBul(talep.kitapId).durum = 'musait';
+  guncelle(talep.id, { durum: 'iptal' });
+  hesap(talep.isteyenId).puan += 1;
+  kaydet();
+}
 export async function talepGeriCek(talep) {
   await bekle();
   guncelle(talep.id, { durum: 'red' });
+  hesap(talep.isteyenId).puan += 1;
   kitapBul(talep.kitapId).durum = 'musait';
   kaydet();
 }
 export async function kargola(talep, firma, takipNo, nereden) {
   await bekle();
-  guncelle(talep.id, { durum: 'kargoda', kargo: { firma, takipNo } });
+  guncelle(talep.id, { durum: 'kargoda', kargo: { firma, takipNo }, kargoTarihi: Date.now() });
   kitapBul(talep.kitapId).durum = 'verildi';
   if (nereden && talep.isteyenSehir) {
     veri.yolculuklar.unshift({
@@ -312,16 +328,86 @@ export async function kargola(talep, firma, takipNo, nereden) {
   kaydet();
   // Demo: alıcı birkaç saniye sonra teslim aldığını bildirir.
   setTimeout(() => {
-    if (talepBul(talep.id)?.durum === 'kargoda') { guncelle(talep.id, { durum: 'teslim' }); kaydet(); }
+    if (talepBul(talep.id)?.durum === 'kargoda') { guncelle(talep.id, { durum: 'teslim' }); hesap(talep.sahipId).puan += 1; kaydet(); }
   }, 15000);
 }
-export async function teslimAldim(talep) {
-  await bekle();
+function teslimEt(talep) {
   guncelle(talep.id, { durum: 'teslim' });
+  hesap(talep.sahipId).puan += 1;
+  if (talep.sorun?.tur === 'ulasmadi') hesap(talep.sahipId).ihtar -= 1;
   const y = veri.yolculuklar.find((x) => x.id === talep.id);
   if (y) Object.assign(y, { teslim: true, teslimTarih: Date.now() });
   kaydet();
 }
+export async function teslimAldim(talep) { await bekle(); teslimEt(talep); }
+export async function otomatikTeslim(talep) { await bekle(); teslimEt(talep); }
+export async function iadeDondu(talep) {
+  await bekle();
+  guncelle(talep.id, { durum: 'iade' });
+  Object.assign(hesap(talep.isteyenId), { ihtar: hesap(talep.isteyenId).ihtar + 1, sonIhtar: Date.now() });
+  kitapBul(talep.kitapId).durum = 'musait';
+  kaydet();
+}
+export async function sorunBildir(talep, tur) {
+  await bekle();
+  guncelle(talep.id, { sorun: { tur, tarih: Date.now() } });
+  Object.assign(hesap(talep.sahipId), { ihtar: hesap(talep.sahipId).ihtar + 1, sonIhtar: Date.now() });
+  kaydet();
+}
+
+// ——— Hesap: puan ve ihtar ———
+function hesap(uid) {
+  veri.puanlar ||= {};
+  return (veri.puanlar[uid] ||= { puan: 2, ihtar: 0, kayit: Date.now() });
+}
+export async function hesapHazirla(uid) { const h = hesap(uid); kaydet(); return { ...h }; }
+export async function hesapGetir(uid) { return { ...hesap(uid) }; }
+export function hesabiDinle(uid, cb) {
+  const d = { uid, cb };
+  dinleyiciler.hesap.add(d);
+  setTimeout(yayinla, 0);
+  return () => dinleyiciler.hesap.delete(d);
+}
+export function telKimligi(tel) {
+  const r = String(tel || '').replace(/\D/g, '').replace(/^(90|0)/, '');
+  return /^5\d{9}$/.test(r) ? r : '';
+}
+
+// ——— Değerlendirme ———
+export async function degerlendir(talep, yildiz, uygun, yorum) {
+  await bekle();
+  veri.degerlendirmeler ||= {};
+  veri.degerlendirmeler[talep.id] = { sahipId: talep.sahipId, isteyenId: talep.isteyenId, yildiz, uygun, yorum, tarih: Date.now() };
+  kaydet();
+}
+export async function degerlendirildiMi(talepId) { return !!veri.degerlendirmeler?.[talepId]; }
+export async function sahipPuani(uid) {
+  const l = Object.values(veri.degerlendirmeler || {}).filter((d) => d.sahipId === uid);
+  // Demo kişilerinin örnek puanları
+  if (!l.length && (KISILER[uid] || EK_KISILER[uid])) return { ort: 4.6 + (uid.length % 3) / 10, adet: 3 + (uid.charCodeAt(1) % 9), uygun: 1 };
+  if (!l.length) return { ort: 0, adet: 0, uygun: 0 };
+  return { ort: l.reduce((t, d) => t + d.yildiz, 0) / l.length, adet: l.length, uygun: l.filter((d) => d.uygun).length / l.length };
+}
+export async function guvenBilgisi(uid) {
+  await bekle(250);
+  const h = hesap(uid);
+  const y = veri.yolculuklar.filter((x) => x.teslim);
+  return {
+    puan: h.puan, ihtar: h.ihtar, kayit: KISILER[uid] ? Date.now() - 140 * gun : h.kayit,
+    paylasti: y.filter((x) => x.sahipId === uid).length, aldi: y.filter((x) => x.isteyenId === uid).length,
+  };
+}
+
+// ——— Engel ve şikâyet ———
+export async function engelleriGetir(uid) { return veri.engeller?.[uid] || []; }
+export async function engelle(uid, hedef, ekle) {
+  veri.engeller ||= {};
+  const l = new Set(veri.engeller[uid] || []);
+  if (ekle) l.add(hedef); else l.delete(hedef);
+  veri.engeller[uid] = [...l];
+  kaydet();
+}
+export async function sikayetEt() { await bekle(); }
 
 export function yolculuklariDinle(cb) {
   dinleyiciler.yolculuk.add(cb);

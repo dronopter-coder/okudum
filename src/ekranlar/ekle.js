@@ -10,7 +10,10 @@ import { ozetiHazirla } from '../ozetAkisi.js';
 import { fotoAl as fotoGetir } from '../foto.js';
 
 export function ekleEkrani(kok) {
-  let foto = '';
+  // "Okudum, rafa koy": teslim alınan kitap ad, yazar ve fotoğrafıyla hazır gelir
+  const taslak = durum.eklemeTaslagi;
+  durum.eklemeTaslagi = null;
+  let foto = taslak?.foto || '';
 
   kok.innerHTML = `
     ${ustBar('Rafına kitap ekle')}
@@ -50,9 +53,17 @@ export function ekleEkrani(kok) {
     </form>`;
 
   const f = $('#e-form', kok);
-  const secim = { kategori: '', kondisyon: 'iyi' };
+  const onceki = taslak ? durum.tumKitaplar.find((k) => k.id === taslak.kitapId) : null;
+  const secim = { kategori: onceki?.kategori || '', kondisyon: 'iyi' };
+  if (taslak) {
+    f.ad.value = taslak.ad;
+    f.yazar.value = taslak.yazar;
+    if (secim.kategori) $$('#e-kat .cip', kok).forEach((x) => x.classList.toggle('secili', x.dataset.v === secim.kategori));
+    f.insertAdjacentHTML('afterbegin', `<div class="ipucu yesil">${ikon('rota', 18)}<span>Bu kitabın yolculuğu sürüyor! Bilgileri hazırladık; durumunu seçip rafına koy.</span></div>`);
+  }
 
   const bosHal = $('#e-onizleme', kok).innerHTML;
+  queueMicrotask(() => { if (foto) onizle(); });
   const onizle = () => {
     const ad = f.ad.value.trim() || 'Kitabın adı';
     const yazar = f.yazar.value.trim() || 'Yazar';
@@ -142,6 +153,7 @@ export function ekleEkrani(kok) {
     try {
       const id = await api.kitapEkle(durum.kullanici, durum.profil, {
         ad, yazar, kategori: secim.kategori, kondisyon: secim.kondisyon, aciklama: f.aciklama.value.trim(),
+        ...(taslak ? { oncekiTalep: taslak.oncekiTalep, elden: (onceki?.elden || 1) + 1 } : {}),
       }, foto);
       titret('guclu');
       toast('Kitabın rafta! Özeti hazırlanıyor…', 'basari');

@@ -9,8 +9,14 @@ export function siralamaHesapla(donem = 'ay') {
   const simdi = new Date();
   const bas = donem === 'ay' ? new Date(simdi.getFullYear(), simdi.getMonth(), 1).getTime() : 0;
   const m = new Map();
+  const ciftler = new Set();
   for (const y of durum.yolculuklar) {
-    if (!y.sahipId || y.tarih < bas) continue;
+    // Yalnızca teslim alınmış gönderimler sayılır; aynı kişiye ayda bir gönderim (karşılıklı şişirmeye karşı)
+    if (!y.sahipId || !y.teslim || y.tarih < bas) continue;
+    const ay = new Date(y.tarih);
+    const cift = `${y.sahipId}|${y.isteyenId}|${ay.getFullYear()}-${ay.getMonth()}`;
+    if (ciftler.has(cift)) continue;
+    ciftler.add(cift);
     const k = m.get(y.sahipId) || { uid: y.sahipId, adet: 0, ilk: y.tarih };
     k.adet++;
     k.ilk = Math.min(k.ilk, y.tarih);
@@ -112,7 +118,7 @@ export function yildizlarEkrani(kok) {
       </ol>
       ${benimSira >= 10 ? `<div class="benim-sira"><span class="sira-no"><b>${benimSira + 1}</b></span>${avatar(durum.profil.ad, durum.profil.foto, 40)}<div><b>Senin sıran</b><span>${tum[benimSira].adet} kitap gönderdin · zirveye ${enCok - tum[benimSira].adet} kitap kaldı</span></div></div>` : ''}
       ${benimSira < 0 ? `<div class="benim-sira"><span class="sira-no">${ikon('yildiz', 16)}</span>${avatar(durum.profil.ad, durum.profil.foto, 40)}<div><b>Sen de listeye girebilirsin</b><span>Bir kitabı kargoya ver, ilk 10'a adım at.</span></div></div>` : ''}
-      <p class="ys-not">${ikon('bilgi', 14)} Sıralama, kargoya verilen kitap sayısına göre hesaplanır. Her ayın başında sıfırlanır.</p>`
+      <p class="ys-not">${ikon('bilgi', 14)} Sıralama, yeni okuruna ulaşan (teslim alınan) kitap sayısına göre hesaplanır. Aynı okura ayda bir gönderim sayılır; her ayın başında sıfırlanır.</p>`
     : bosDurum('kupa', 'Liste henüz boş', 'Kargoya verilen ilk kitap, gönderenini zirveye taşır.')}`;
 
     kok.querySelectorAll('[data-d]').forEach((b) => b.addEventListener('click', () => { donem = b.dataset.d; ciz(); yukle(); }));

@@ -9,7 +9,11 @@ export const durum = {
   yolculuklar: [], // herkese açık kargo rotaları (Haftanın yolculukları)
   profilOnbellek: new Map(), // başka kullanıcıların herkese açık profilleri: uid → { ad, sehir, foto }
   ozetHazirlaniyor: new Set(), // yapay zekâ özeti üretilen kitap kimlikleri
+  hesap: { puan: 2, ihtar: 0 }, // ver-al puanı ve ihtarlar
+  engel: new Set(), // engellenen kullanıcılar (kitapları görünmez, talep edemezler)
+  tumKitaplar: [], // engel süzgecinden önceki liste
 };
+export const kitaplariSuz = () => { durum.kitaplar = durum.tumKitaplar.filter((k) => !durum.engel.has(k.sahipId)); };
 
 const aboneler = new Set();
 export function abone(cb) {

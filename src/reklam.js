@@ -44,7 +44,7 @@ export async function reklamlariBaslat() {
       if (bilgi?.canRequestAds === false) return;
     } catch {}
     await AdMob.initialize({ initializeForTesting: REKLAM.test });
-    AdMob.addListener(BannerAdPluginEvents.SizeChanged, (b) => { if (bannerAcik) yukseklikAyarla(b?.height || 0); });
+    AdMob.addListener(BannerAdPluginEvents.SizeChanged, (b) => { sonYukseklik = b?.height || 0; if (bannerAcik && !bastirma) yukseklikAyarla(sonYukseklik); });
     AdMob.addListener(BannerAdPluginEvents.FailedToLoad, () => yukseklikAyarla(0));
     hazir = true;
     if (bannerIstenen) bannerGoster(true);
@@ -64,6 +64,7 @@ export async function bannerGoster(goster) {
         adId: REKLAM.banner, adSize: BannerAdSize.ADAPTIVE_BANNER, position: BannerAdPosition.BOTTOM_CENTER,
         margin: 0, isTesting: REKLAM.test,
       });
+      if (bastirma > 0) { yukseklikAyarla(0); await AdMob.hideBanner(); }
     } else {
       yukseklikAyarla(0);
       await AdMob.removeBanner();
@@ -72,6 +73,23 @@ export async function bannerGoster(goster) {
     bannerAcik = false;
     yukseklikAyarla(0);
   }
+}
+
+// Alt pencere (sheet) açıkken banner gizlenir: reklam düğmelerin üzerine binmesin.
+let bastirma = 0;
+let sonYukseklik = 0;
+export async function bannerBastir(acik) {
+  bastirma = Math.max(0, bastirma + (acik ? 1 : -1));
+  if (!hazir || !bannerAcik) return;
+  try {
+    if (bastirma > 0) {
+      yukseklikAyarla(0);
+      await AdMob.hideBanner();
+    } else {
+      await AdMob.resumeBanner();
+      yukseklikAyarla(sonYukseklik);
+    }
+  } catch {}
 }
 
 // Kullanıcıyı yormamak için: her 3. önemli işlemde ve en az 3 dakikada bir.

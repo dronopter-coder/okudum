@@ -1,6 +1,6 @@
 // Ortak arayüz yardımcıları: ikonlar, kapak üretici, toast, alt sayfa (sheet), onay penceresi.
 import {
-  House, Search, Plus, Play, Volume2, ArrowLeftRight, User, ArrowLeft, Camera, Image, MapPin, Truck, Check, X,
+  House, Search, Plus, Play, Volume2, Share2, Flag as Bayrak2, Ban, RotateCcw, AlertTriangle, Coins, ArrowLeftRight, User, ArrowLeft, Camera, Image, MapPin, Truck, Check, X,
   Package, BookOpen, Heart, Trash2, LogOut, ChevronRight, Send, Inbox, Copy, Info, Pencil,
   ShieldCheck, Sparkles, Mail, Lock, Eye, EyeOff, PackageCheck, CircleHelp, HandHeart, Undo2,
   BookMarked, SlidersHorizontal, Clock, Library, Map as HaritaIkon, MapPinned, Route, LocateFixed, Minus, Flag, TrendingUp,
@@ -8,9 +8,10 @@ import {
 } from 'lucide';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Capacitor } from '@capacitor/core';
+import { bannerBastir } from './reklam.js';
 
 const IKONLAR = {
-  oynat: Play, ses: Volume2, ev: House, ara: Search, arti: Plus, takas: ArrowLeftRight, kisi: User, geri: ArrowLeft,
+  oynat: Play, ses: Volume2, paylas: Share2, bildir: Bayrak2, engel: Ban, iade: RotateCcw, uyari: AlertTriangle, puan: Coins, ev: House, ara: Search, arti: Plus, takas: ArrowLeftRight, kisi: User, geri: ArrowLeft,
   kamera: Camera, resim: Image, konum: MapPin, kargo: Truck, tik: Check, x: X, paket: Package,
   kitap: BookOpen, kalp: Heart, cop: Trash2, cikis: LogOut, sag: ChevronRight, gonder: Send,
   gelen: Inbox, kopya: Copy, bilgi: Info, kalem: Pencil, kalkan: ShieldCheck, parilti: Sparkles,
@@ -132,6 +133,7 @@ export function sayfaAc(icerik, { sinif = '' } = {}) {
   kap.className = 'sheet-kap';
   kap.innerHTML = `<div class="sheet-perde"></div><div class="sheet ${sinif}"><div class="sheet-tutamak"></div>${icerik}</div>`;
   document.body.appendChild(kap);
+  bannerBastir(true);
   requestAnimationFrame(() => requestAnimationFrame(() => kap.classList.add('acik')));
   let kapandi = false;
   let cozucu;
@@ -143,6 +145,7 @@ export function sayfaAc(icerik, { sinif = '' } = {}) {
     kapandi = true;
     acikSayfalar.splice(acikSayfalar.indexOf(kayit), 1);
     kap.classList.remove('acik');
+    bannerBastir(false);
     window.removeEventListener('popstate', geriTusu);
     setTimeout(() => { kap.remove(); cozucu(); }, 300);
   };
@@ -229,6 +232,9 @@ export function hataMetni(e) {
     'auth/network-request-failed': 'İnternet bağlantısı yok gibi görünüyor.',
     'auth/popup-closed-by-user': 'Giriş penceresi kapatıldı.',
     'permission-denied': 'Bu işlem için yetkin yok.',
+    'okudum/telefon-gecersiz': 'Cep telefonu numaranı 05xx xxx xx xx biçiminde yaz.',
+    'okudum/telefon-baska-hesapta': 'Bu telefon numarası başka bir Okudum hesabında kayıtlı. Her numara yalnızca bir hesapta kullanılabilir.',
+    'okudum/puan-yok': 'Puanın kalmadı. Bir kitap paylaşınca yeniden kitap isteyebilirsin.',
     unavailable: 'Sunucuya ulaşılamadı. İnternet bağlantını kontrol et.',
   };
   if (tablo[k]) return tablo[k];

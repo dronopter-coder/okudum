@@ -6,6 +6,7 @@ import { KATEGORILER } from '../sabitler.js';
 import { kitapKarti, bosDurum, iskelet, logo, bulunma } from './ortak.js';
 import { haftaninYolculuklari, ozet, rotaHaritasi } from './yolculuklar.js';
 import { yildizKartiHtml, yildizKartiniYenile } from './yildizlar.js';
+import { uygulamayiPaylas } from '../paylas.js';
 
 function selam() {
   const s = new Date().getHours();
@@ -26,8 +27,11 @@ export function kesfetEkrani(kok) {
 
     kok.innerHTML = `
     <header class="kesfet-ust">
-      ${logo()}
-      <button class="avatar-dugme" data-git="profil" aria-label="Profil">${avatar(p?.ad, p?.foto, 40)}</button>
+      <a class="logo-bag" data-git="yolculuklar" aria-label="Haftanın yolculukları">${logo()}</a>
+      <div class="ust-sag">
+        <button class="yuvarlak paylas-dugme" id="ks-paylas" aria-label="Okudum'u paylaş">${ikon('paylas', 19)}</button>
+        <button class="avatar-dugme" data-git="profil" aria-label="Profil">${avatar(p?.ad, p?.foto, 40)}</button>
+      </div>
     </header>
     <section class="selam">
       <p>${selam()}${ilkAd ? `, ${h(ilkAd)}` : ''} ✨</p>
@@ -77,6 +81,7 @@ export function kesfetEkrani(kok) {
   };
   ciz();
   yildizKartiniYenile(kok);
+  kok.addEventListener('click', (e) => { if (e.target.closest('#ks-paylas')) uygulamayiPaylas(); });
   return {
     guncelle(neler) {
       if (neler === 'yolculuklar') {

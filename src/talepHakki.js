@@ -28,8 +28,21 @@ export const odulKullan = () => { try { localStorage.removeItem(odulAnahtari());
 
 const tarihYaz = (ms) => new Date(ms).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' });
 
-// true → talep formu açılabilir
+// true → talep formu açılabilir. Sıra: ihtar cezası → puan → haftalık sınır (2. talep reklamla)
 export async function talepHakkiAl() {
+  const hs = durum.hesap || { puan: 2, ihtar: 0 };
+  if (hs.ihtar >= 3) {
+    bilgiSayfasi('engel', 'Talep hakkın kapatıldı', 'Hesabına <b>3 ihtar</b> yazıldığı için yeni kitap isteyemiyorsun. Bir yanlışlık olduğunu düşünüyorsan <a href="mailto:eroglu2141@gmail.com">eroglu2141@gmail.com</a> adresine yaz.');
+    return false;
+  }
+  if (hs.ihtar === 2 && hs.sonIhtar && Date.now() < hs.sonIhtar + 30 * 86400000) {
+    bilgiSayfasi('uyari', '30 gün talep yapamazsın', `Hesabında <b>2 ihtar</b> var (teslim alınmayan kargo ya da bildirilen sorun). Yeniden kitap isteyebileceğin gün: <b>${h(tarihYaz(hs.sonIhtar + 30 * 86400000))}</b>. Bir ihtar daha alırsan talep hakkın tamamen kapanır.`);
+    return false;
+  }
+  if ((hs.puan ?? 2) < 1) {
+    bilgiSayfasi('puan', 'Puanın kalmadı', 'Okudum\'da kitaplar <b>ver-al dengesiyle</b> dolaşır: her talep 1 puan harcar, gönderdiğin her kitap yeni okuruna ulaşınca 1 puan kazanırsın. Rafına bir kitap ekle; biri isteyip teslim aldığında yeniden kitap isteyebilirsin.', true);
+    return false;
+  }
   const liste = haftalikTalepler();
   if (liste.length === 0) return true;
   if (liste.length >= HAFTALIK_SINIR) {
@@ -39,6 +52,19 @@ export async function talepHakkiAl() {
   }
   if (odulVar()) return true;
   return reklamSayfasi();
+}
+
+function bilgiSayfasi(simge, baslik, metin, ekle = false) {
+  sesCal('yumusak');
+  const s = sayfaAc(`
+    <div class="hak-sayfa">
+      <div class="hak-simge">${ikon(simge, 30, 2)}</div>
+      <h3 class="sheet-baslik">${h(baslik)}</h3>
+      <p class="sheet-metin">${metin}</p>
+      ${ekle ? `<button class="dugme ana genis" id="h-ekle">${ikon('arti', 18)}<span>Rafıma kitap ekle</span></button>` : ''}
+      <button class="dugme hayalet genis" data-kapat>Tamam</button>
+    </div>`);
+  $('#h-ekle', s.el)?.addEventListener('click', async () => { await s.kapat(); git('ekle'); });
 }
 
 function hakNoktalari(kullanilan) {

@@ -9,6 +9,22 @@ service cloud.firestore {
     function ben(uid) { return girisli() && request.auth.uid == uid; }
     function degisen() { return request.resource.data.diff(resource.data).affectedKeys(); }
     function metin(v, en) { return v is string && v.size() <= en; }
+    function yol(p) { return path('/databases/' + database + '/documents/' + p); }
+    function talepYolu(id) { return /databases/$(database)/documents/talepler/$(id); }
+    function hesapYolu(uid) { return /databases/$(database)/documents/hesaplar/$(uid); }
+    function ihtarYolu(id) { return /databases/$(database)/documents/ihtarlar/$(id); }
+    // Hesap (puan/ihtar) belgesi henüz yoksa başlangıç değerleri
+    function hesapOnce(uid) {
+      return exists(hesapYolu(uid)) ? get(hesapYolu(uid)).data : { 'puan': 2, 'ihtar': 0 };
+    }
+    // Talep işlemiyle birlikte hesaba +1 puan yazılmış mı (iade ya da kazanç)
+    function puanArtti(uid, talepId) {
+      return existsAfter(hesapYolu(uid))
+        && getAfter(hesapYolu(uid)).data.puan == hesapOnce(uid).puan + 1
+        && getAfter(hesapYolu(uid)).data.son == talepId;
+    }
+    // Sunucu zamanı alanı; eski kayıtlarda yoksa son güncelleme zamanı
+    function zaman(t, alan) { return t.get(alan, timestamp.value(t.guncelleme)); }
 
     // ——— Kullanıcı profilleri (herkese açık: ad, şehir, foto, hakkında) ———
     match /kullanicilar/{uid} {
@@ -18,10 +34,87 @@ service cloud.firestore {
         && metin(request.resource.data.sehir, 30)
         && metin(request.resource.data.get('hakkinda', ''), 200)
         && metin(request.resource.data.get('foto', ''), 30000);
-      // Kayıtlı teslimat adresi: yalnızca sahibi
+      // Kayıtlı teslimat adresi ve engel listesi: yalnızca sahibi
       match /ozel/{belge} {
         allow read, write: if ben(uid);
       }
+    }
+
+    // ——— Hesap: puan (ver-al dengesi) ve ihtarlar ———
+    // Yeni üye 2 puanla başlar. Talep 1 puan harcar; reddedilen/geri çekilen talebin puanı iade edilir;
+    // teslim edilen her kitap gönderene 1 puan kazandırır. Değişiklikler yalnızca ilgili talep işlemiyle birlikte yapılabilir.
+    match /hesaplar/{uid} {
+      allow read: if girisli();
+      allow create: if ben(uid) && request.resource.data.keys().hasOnly(['puan', 'ihtar', 'kayit', 'son'])
+        && request.resource.data.puan == 2 && request.resource.data.ihtar == 0
+        && request.resource.data.kayit == request.time && request.resource.data.son == '';
+      allow create, update: if girisli() && hesapDegisimi(uid);
+
+      function hesapDegisimi(uid) {
+        let o = hesapOnce(uid);
+        let y = request.resource.data;
+        let t = y.son;
+        let dp = y.puan - o.puan;
+        let di = y.ihtar - o.ihtar;
+        return y.diff(o).affectedKeys().hasOnly(['puan', 'ihtar', 'son', 'sonIhtar'])
+          && t is string && t.size() > 0 && t.size() < 64
+          && (dp != 0 || di != 0)
+          && (
+            dp == 0
+            // Talep oluştururken 1 puan harcanır
+            || (dp == -1 && ben(uid) && o.puan >= 1 && !exists(talepYolu(t))
+                && getAfter(talepYolu(t)).data.isteyenId == uid && getAfter(talepYolu(t)).data.durum == 'bekliyor')
+            // İade: bekleyen/kabul edilmiş talep reddedildi ya da geri çekildi
+            || (dp == 1 && exists(talepYolu(t)) && get(talepYolu(t)).data.isteyenId == uid
+                && get(talepYolu(t)).data.durum in ['bekliyor', 'kabul']
+                && getAfter(talepYolu(t)).data.durum in ['red', 'iptal'])
+            // Kazanç: gönderilen kitap teslim edildi
+            || (dp == 1 && exists(talepYolu(t)) && get(talepYolu(t)).data.sahipId == uid
+                && get(talepYolu(t)).data.durum == 'kargoda' && getAfter(talepYolu(t)).data.durum == 'teslim')
+          )
+          && (
+            (di == 0 && y.get('sonIhtar', null) == o.get('sonIhtar', null))
+            // İhtar: bu talep için yeni bir ihtar kaydı açıldı
+            || (di == 1 && y.sonIhtar == request.time && (
+                  (!exists(ihtarYolu(t + '_i')) && existsAfter(ihtarYolu(t + '_i')) && getAfter(ihtarYolu(t + '_i')).data.hedefId == uid)
+                  || (!exists(ihtarYolu(t + '_s')) && existsAfter(ihtarYolu(t + '_s')) && getAfter(ihtarYolu(t + '_s')).data.hedefId == uid)))
+            // "Ulaşmadı" bildirimi, kitap sonradan teslim alınınca geri alındı
+            || (di == -1 && y.get('sonIhtar', null) == o.get('sonIhtar', null)
+                && exists(ihtarYolu(t + '_s')) && !existsAfter(ihtarYolu(t + '_s'))
+                && get(ihtarYolu(t + '_s')).data.hedefId == uid)
+          );
+      }
+    }
+
+    // ——— İhtarlar ———
+    // {talepId}_i: kitap sahibinin "kargo iade döndü" bildirimi (hedef: talep eden)
+    // {talepId}_s: talep edenin sorun bildirimi — ulaşmadı / tahsilat istendi / boş paket (hedef: kitap sahibi)
+    match /ihtarlar/{id} {
+      allow read: if girisli() && (request.auth.uid == resource.data.verenId || request.auth.uid == resource.data.hedefId);
+      allow create: if ben(request.resource.data.verenId)
+        && request.resource.data.keys().hasOnly(['talepId', 'verenId', 'hedefId', 'tur', 'tarih'])
+        && request.resource.data.tarih == request.time
+        && ihtarGecerli(request.resource.data, getAfter(talepYolu(request.resource.data.talepId)).data)
+        && getAfter(hesapYolu(request.resource.data.hedefId)).data.ihtar == hesapOnce(request.resource.data.hedefId).ihtar + 1;
+      // Yalnızca "ulaşmadı" bildirimi, kitap sonradan teslim alınınca geri alınabilir
+      allow delete: if ben(resource.data.verenId) && resource.data.tur == 'ulasmadi'
+        && getAfter(talepYolu(resource.data.talepId)).data.durum == 'teslim'
+        && getAfter(hesapYolu(resource.data.hedefId)).data.ihtar == get(hesapYolu(resource.data.hedefId)).data.ihtar - 1;
+
+      function ihtarGecerli(i, t) {
+        return (id == i.talepId + '_i' && i.tur == 'iade' && i.verenId == t.sahipId && i.hedefId == t.isteyenId && t.durum == 'iade')
+          || (id == i.talepId + '_s' && i.tur in ['ulasmadi', 'tahsilat', 'bos'] && i.verenId == t.isteyenId
+              && i.hedefId == t.sahipId && t.sorun.tur == i.tur);
+      }
+    }
+
+    // ——— Telefon numaraları: bir cep numarası yalnızca bir hesapta talep için kullanılabilir ———
+    // Belge kimliği 5xxxxxxxxx biçiminde numaradır; kimse başkasının kaydını okuyamaz.
+    match /telefonlar/{tel} {
+      allow read: if girisli() && (resource == null || resource.data.uid == request.auth.uid);
+      allow create: if ben(request.resource.data.uid) && tel.matches('^5[0-9]{9}$')
+        && request.resource.data.keys().hasOnly(['uid']);
+      allow update: if ben(resource.data.uid) && request.resource.data == resource.data;
     }
 
     // ——— Kitaplar ———
@@ -42,65 +135,150 @@ service cloud.firestore {
         && request.resource.data.sahipId == resource.data.sahipId
         && request.resource.data.durum in ['musait', 'rezerve', 'verildi']
         && metin(request.resource.data.get('ozet', ''), 3000);
+      // Süresi dolan kabulden vazgeçen okur, ayrılmış kitabı yeniden rafa açar
+      allow update: if girisli() && degisen().hasOnly(['durum'])
+        && resource.data.durum == 'rezerve' && request.resource.data.durum == 'musait'
+        && getAfter(talepYolu(resource.data.talepId)).data.isteyenId == request.auth.uid
+        && getAfter(talepYolu(resource.data.talepId)).data.durum == 'iptal';
       allow delete: if ben(resource.data.sahipId);
     }
 
     // ——— Talepler ———
-    // Akış: bekliyor → kabul → kargoda → teslim   (yan yollar: red, iptal)
+    // Akış: bekliyor → kabul → kargoda → teslim   (yan yollar: red, iptal, iade)
     match /talepler/{talepId} {
       allow read: if girisli()
         && (request.auth.uid == resource.data.sahipId || request.auth.uid == resource.data.isteyenId);
 
+      // Talep: 1 puan harcanır; adres (hesaba kayıtlı telefonla) aynı işlemde yazılır; ihtar ve engel kontrolü
       allow create: if ben(request.resource.data.isteyenId)
         && request.resource.data.durum == 'bekliyor'
         && request.resource.data.kargo == null
+        && request.resource.data.get('sorun', null) == null
         && metin(request.resource.data.not, 300)
         && request.resource.data.sahipId != request.auth.uid
-        && get(/databases/$(database)/documents/kitaplar/$(request.resource.data.kitapId)).data.sahipId == request.resource.data.sahipId
-        && get(/databases/$(database)/documents/kitaplar/$(request.resource.data.kitapId)).data.durum == 'musait';
+        && get(yol('kitaplar/' + request.resource.data.kitapId)).data.sahipId == request.resource.data.sahipId
+        && get(yol('kitaplar/' + request.resource.data.kitapId)).data.durum == 'musait'
+        && existsAfter(yol('talepler/' + talepId + '/gizli/adres'))
+        && exists(hesapYolu(request.auth.uid))
+        && getAfter(hesapYolu(request.auth.uid)).data.puan == get(hesapYolu(request.auth.uid)).data.puan - 1
+        && getAfter(hesapYolu(request.auth.uid)).data.son == talepId
+        && cezasiz(get(hesapYolu(request.auth.uid)).data)
+        && !engelli(request.resource.data.sahipId);
 
-      // Kitap sahibinin yapabildikleri: kabul / red / vazgeç / kargoya ver
+      // 3 ihtar: talep hakkı kapanır. 2 ihtar: son ihtardan sonraki 30 gün talep yapılamaz.
+      function cezasiz(h) {
+        return h.ihtar < 2 || (h.ihtar == 2 && request.time > h.sonIhtar + duration.value(30, 'd'));
+      }
+      function engelli(sahipId) {
+        return exists(yol('kullanicilar/' + sahipId + '/ozel/engel'))
+          && request.auth.uid in get(yol('kullanicilar/' + sahipId + '/ozel/engel')).data.get('uidler', []);
+      }
+
+      // Kitap sahibinin yapabildikleri
       allow update: if ben(resource.data.sahipId)
-        && degisen().hasOnly(['durum', 'kargo', 'guncelleme'])
+        && degisen().hasOnly(['durum', 'kargo', 'guncelleme', 'kabulTarihi', 'kargoTarihi'])
         && (
-          (resource.data.durum == 'bekliyor' && request.resource.data.durum in ['kabul', 'red'])
-          || (resource.data.durum == 'kabul' && request.resource.data.durum == 'red')
+          (resource.data.durum == 'bekliyor' && request.resource.data.durum == 'kabul'
+              && request.resource.data.kabulTarihi == request.time)
+          // Red ve vazgeç: talep edenin puanı iade edilir
+          || (resource.data.durum in ['bekliyor', 'kabul'] && request.resource.data.durum == 'red'
+              && puanArtti(resource.data.isteyenId, talepId))
           || (resource.data.durum == 'kabul' && request.resource.data.durum == 'kargoda'
+              && request.resource.data.kargoTarihi == request.time
               && metin(request.resource.data.kargo.firma, 40)
               && metin(request.resource.data.kargo.takipNo, 40))
+          // Kargodan 14 gün sonra itirazsız ve onaysız kalan gönderi teslim edilmiş sayılır
+          || (resource.data.durum == 'kargoda' && request.resource.data.durum == 'teslim'
+              && resource.data.get('sorun', null) == null
+              && request.time > zaman(resource.data, 'kargoTarihi') + duration.value(14, 'd')
+              && puanArtti(resource.data.sahipId, talepId))
         );
 
-      // Talep edenin yapabildikleri: geri çekme / teslim aldım
+      // Kitap sahibi: kargo iade döndü (talep edene ihtar)
+      allow update: if ben(resource.data.sahipId)
+        && degisen().hasOnly(['durum', 'guncelleme'])
+        && resource.data.durum == 'kargoda' && request.resource.data.durum == 'iade'
+        && request.time > zaman(resource.data, 'kargoTarihi') + duration.value(2, 'd')
+        && existsAfter(ihtarYolu(talepId + '_i'));
+
+      // Talep edenin yapabildikleri
       allow update: if ben(resource.data.isteyenId)
         && degisen().hasOnly(['durum', 'guncelleme'])
         && (
-          (resource.data.durum == 'bekliyor' && request.resource.data.durum == 'iptal')
-          || (resource.data.durum == 'kargoda' && request.resource.data.durum == 'teslim')
+          // Bekleyen talebi geri çekme; kabulden 7 gün sonra hâlâ kargolanmadıysa vazgeçme (puan iade)
+          ((resource.data.durum == 'bekliyor'
+              || (resource.data.durum == 'kabul' && request.time > zaman(resource.data, 'kabulTarihi') + duration.value(7, 'd')))
+            && request.resource.data.durum == 'iptal'
+            && puanArtti(request.auth.uid, talepId))
+          // Teslim aldım: gönderene 1 puan
+          || (resource.data.durum == 'kargoda' && request.resource.data.durum == 'teslim'
+              && puanArtti(resource.data.sahipId, talepId))
         );
 
+      // Talep eden: sorun bildirimi (kitap sahibine ihtar). "Ulaşmadı" ancak kargodan 5 gün sonra bildirilebilir.
+      allow update: if ben(resource.data.isteyenId)
+        && degisen().hasOnly(['sorun', 'guncelleme'])
+        && resource.data.durum == 'kargoda' && resource.data.get('sorun', null) == null
+        && request.resource.data.sorun.keys().hasOnly(['tur', 'tarih'])
+        && request.resource.data.sorun.tarih == request.time
+        && request.resource.data.sorun.tur in ['ulasmadi', 'tahsilat', 'bos']
+        && (request.resource.data.sorun.tur != 'ulasmadi'
+            || request.time > zaman(resource.data, 'kargoTarihi') + duration.value(5, 'd'))
+        && existsAfter(ihtarYolu(talepId + '_s'));
+
       // Teslimat adresi: talep eden yazar; kitap sahibi yalnızca talebi kabul ettikten sonra okur.
+      // Cep telefonu, talep edenin hesabına kayıtlı olmalı (bir numara = bir hesap).
       match /gizli/{belge} {
-        function talep() { return get(/databases/$(database)/documents/talepler/$(talepId)).data; }
+        function talep() { return get(talepYolu(talepId)).data; }
         allow create: if girisli()
-          && getAfter(/databases/$(database)/documents/talepler/$(talepId)).data.isteyenId == request.auth.uid;
+          && getAfter(talepYolu(talepId)).data.isteyenId == request.auth.uid
+          && request.resource.data.telKimlik is string
+          && request.resource.data.telKimlik.matches('^5[0-9]{9}$')
+          && request.resource.data.telefon.replace('[^0-9]', '').matches('^(90|0)?' + request.resource.data.telKimlik + '$')
+          && getAfter(yol('telefonlar/' + request.resource.data.telKimlik)).data.uid == request.auth.uid;
         allow read: if girisli() && (
           talep().isteyenId == request.auth.uid
-          || (talep().sahipId == request.auth.uid && talep().durum in ['kabul', 'kargoda', 'teslim'])
+          || (talep().sahipId == request.auth.uid && talep().durum in ['kabul', 'kargoda', 'teslim', 'iade'])
         );
       }
     }
 
+    // ——— Değerlendirmeler: teslim alan, kitabı ve göndereni puanlar (talep başına bir kez) ———
+    match /degerlendirmeler/{talepId} {
+      allow read: if girisli();
+      allow create: if ben(request.resource.data.isteyenId)
+        && request.resource.data.keys().hasOnly(['sahipId', 'isteyenId', 'yildiz', 'uygun', 'yorum', 'tarih'])
+        && get(talepYolu(talepId)).data.isteyenId == request.auth.uid
+        && get(talepYolu(talepId)).data.sahipId == request.resource.data.sahipId
+        && get(talepYolu(talepId)).data.durum == 'teslim'
+        && request.resource.data.yildiz is int && request.resource.data.yildiz >= 1 && request.resource.data.yildiz <= 5
+        && request.resource.data.uygun is bool
+        && metin(request.resource.data.yorum, 200)
+        && request.resource.data.tarih == request.time;
+    }
+
+    // ——— Şikâyetler: yalnızca yazılır (Firebase konsolundan incelenir) ———
+    match /sikayetler/{id} {
+      allow create: if ben(request.resource.data.verenId)
+        && request.resource.data.keys().hasOnly(['verenId', 'hedefTur', 'hedefId', 'sebep', 'aciklama', 'tarih'])
+        && request.resource.data.hedefTur in ['kitap', 'kisi']
+        && metin(request.resource.data.hedefId, 64)
+        && metin(request.resource.data.sebep, 40)
+        && metin(request.resource.data.aciklama, 300)
+        && request.resource.data.tarih == request.time;
+    }
+
     // ——— Yolculuklar (Haftanın yolculukları) ———
-    // Kişi bilgisi yok: kitap, nereden → nereye, tarih. Kargoya veren kitap sahibi açar; alıcı "teslim" işaretler.
+    // Kişi bilgisi yok: kitap, nereden → nereye, tarih. Kargoya veren kitap sahibi açar; teslimde işaretlenir.
     match /yolculuklar/{talepId} {
       allow read: if girisli();
       allow create: if ben(request.resource.data.sahipId)
-        && get(/databases/$(database)/documents/talepler/$(talepId)).data.sahipId == request.auth.uid
-        && get(/databases/$(database)/documents/talepler/$(talepId)).data.isteyenId == request.resource.data.isteyenId
+        && get(talepYolu(talepId)).data.sahipId == request.auth.uid
+        && get(talepYolu(talepId)).data.isteyenId == request.resource.data.isteyenId
         && request.resource.data.teslim == false
         && metin(request.resource.data.nereden, 30)
         && metin(request.resource.data.nereye, 30);
-      allow update: if ben(resource.data.isteyenId)
+      allow update: if (ben(resource.data.isteyenId) || (ben(resource.data.sahipId) && get(talepYolu(talepId)).data.durum == 'teslim'))
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teslim', 'teslimTarih'])
         && request.resource.data.teslim == true;
     }

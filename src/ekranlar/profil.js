@@ -55,6 +55,10 @@ export function profilEkrani(kok) {
       <button class="profil-avatar" data-git="profil-duzenle" aria-label="Profil fotoğrafını değiştir">${avatar(p.ad, p.foto, 88)}<i class="foto-rozet">${ikon('kamera', 15, 2.2)}</i></button>
       <h1>${h(p.ad)}</h1>
       <p class="profil-alt">${ikon('konum', 15)} ${h(p.sehir)} · <span class="unvan">${unvan}</span></p>
+      <div class="profil-cipler">
+        <button class="puan-cip" id="p-puan">${ikon('puan', 15)}<b>${durum.hesap.puan ?? 2}</b> puan</button>
+        ${durum.hesap.ihtar ? `<button class="puan-cip ihtar" id="p-ihtar">${ikon('uyari', 15)}<b>${durum.hesap.ihtar}</b> ihtar</button>` : ''}
+      </div>
       ${p.hakkinda ? `<p class="profil-hakkinda">${h(p.hakkinda)}</p>` : ''}
       <div class="istatistik">
         ${ist('rafta', rafta.length, 'Rafımda')}
@@ -81,6 +85,8 @@ export function profilEkrani(kok) {
 
     kok.querySelectorAll('[data-b]').forEach((b) => b.addEventListener('click', () => { bolum = b.dataset.b; titret(); ciz(); }));
     $('#p-nasil', kok).addEventListener('click', nasilCalisir);
+    $('#p-puan', kok).addEventListener('click', puanBilgisi);
+    $('#p-ihtar', kok)?.addEventListener('click', puanBilgisi);
     $('#p-ses', kok).addEventListener('click', (e) => {
       const acik = !sesAcikMi();
       sesAyarla(acik);
@@ -108,7 +114,8 @@ export function nasilCalisir() {
       ${adim(2, 'kitap', 'İste', 'Okumak istediğin bir kitap gördüğünde teslimat adresinle birlikte talep gönder.')}
       ${adim(3, 'tik', 'Onayla', 'Kitabın sahibi talebi kabul eder; adresin yalnızca bu adımdan sonra ona görünür.')}
       ${adim(4, 'kargo', 'Karşı ödemeli kargo', 'Sahibi kitabı karşı ödemeli kargoya verir ve takip numarasını girer. Kitap ücretsizdir; alıcı yalnızca kargo ücretini öder.')}
-      ${adim(5, 'el', 'Zinciri sürdür', 'Kitabı bitirdiğinde sen de rafına ekle, yolculuğu devam etsin.')}
+      ${adim(5, 'puan', 'Ver-al dengesi', 'Her üye 2 puanla başlar. Bir kitap istemek 1 puan harcar; gönderdiğin kitap yeni okuruna ulaşınca 1 puan kazanırsın.')}
+      ${adim(6, 'el', 'Zinciri sürdür', 'Kitabı bitirdiğinde “Okudum, rafa koy” ile yeniden rafına ekle; kitabın yolculuğu devam etsin.')}
     </ol>
     <button class="dugme ana genis" data-kapat>Anladım</button>`, { sinif: 'uzun' });
 }
@@ -118,10 +125,33 @@ function kurallar() {
     <h3 class="sheet-baslik">Topluluk kuralları</h3>
     <ul class="kural-liste">
       <li>${ikon('tik', 18)}<span>Kitaplar <b>ücretsiz</b> paylaşılır; kitap için ücret istenmez. Alıcı yalnızca kargo ücretini öder.</span></li>
+      <li>${ikon('tik', 18)}<span>Gönderiyi <b>“ücreti alıcıdan”</b> seçeneğiyle oluştur. Ürün bedeli tahsilatlı gönderi yapmak yasaktır ve hesabın kapatılmasına yol açar.</span></li>
       <li>${ikon('tik', 18)}<span>Kitabın durumunu dürüstçe belirt; eksik sayfa ya da hasar varsa notta yaz.</span></li>
-      <li>${ikon('tik', 18)}<span>Kabul ettiğin talebi birkaç gün içinde kargoya ver.</span></li>
-      <li>${ikon('tik', 18)}<span>Karşı ödemeli gönderiyi teslim almamak göndereni mağdur eder; istediğin kitabı mutlaka teslim al.</span></li>
+      <li>${ikon('tik', 18)}<span>Kabul ettiğin talebi <b>5 gün içinde</b> kargoya ver. 7 gün geçerse okur talebinden vazgeçebilir.</span></li>
+      <li>${ikon('tik', 18)}<span>İstediğin kitabı mutlaka teslim al ve uygulamadan onayla. Onaylanmayan gönderi 14 gün sonra teslim edilmiş sayılır.</span></li>
+      <li>${ikon('tik', 18)}<span>Teslim alınmayan kargo ve haklı sorun bildirimleri <b>ihtar</b> yazar. 2 ihtarda 30 gün kitap istenemez, 3 ihtarda talep hakkı kapanır.</span></li>
+      <li>${ikon('tik', 18)}<span>Her cep telefonu numarası yalnızca bir hesapta kullanılabilir.</span></li>
       <li>${ikon('tik', 18)}<span>Paylaştığın adres ve telefon bilgisini başka amaçla kullanma.</span></li>
     </ul>
+    <p class="sheet-not">${ikon('bilgi', 14)}<span>İtiraz ve sorular için: <a href="mailto:eroglu2141@gmail.com">eroglu2141@gmail.com</a></span></p>
     <button class="dugme ana genis" data-kapat>Tamam</button>`, { sinif: 'uzun' });
+}
+
+// Puan ve ihtar özeti
+function puanBilgisi() {
+  const hs = durum.hesap;
+  const s = sayfaAc(`
+    <div class="hak-sayfa">
+      <div class="hak-simge">${ikon('puan', 30, 2)}</div>
+      <h3 class="sheet-baslik">${hs.puan ?? 2} puanın var</h3>
+      <p class="sheet-metin">Okudum'da kitaplar <b>ver-al dengesiyle</b> dolaşır; böylece kitaplar gerçekten okuyanlara gider.</p>
+    </div>
+    <ul class="kural-liste">
+      <li>${ikon('arti', 18)}<span>Her üye <b>2 puanla</b> başlar.</span></li>
+      <li>${ikon('kitap', 18)}<span>Bir kitap istemek <b>1 puan</b> harcar. Talep reddedilir ya da geri çekilirse puan iade edilir.</span></li>
+      <li>${ikon('el', 18)}<span>Gönderdiğin kitap yeni okuruna ulaşınca <b>1 puan</b> kazanırsın.</span></li>
+      <li>${ikon('uyari', 18)}<span>İhtarların: <b>${hs.ihtar || 0}</b>. 2 ihtarda 30 gün kitap istenemez, 3 ihtarda talep hakkı kapanır.</span></li>
+    </ul>
+    <button class="dugme ana genis" id="pb-ekle">${ikon('arti', 18)}<span>Rafıma kitap ekle</span></button>`, { sinif: 'uzun' });
+  $('#pb-ekle', s.el).addEventListener('click', async () => { await s.kapat(); git('ekle'); });
 }

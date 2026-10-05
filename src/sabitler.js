@@ -20,6 +20,7 @@ export const TALEP_DURUM = {
   teslim: { ad: 'Teslim alındı', renk: '#3F6B57', adim: 4 },
   red: { ad: 'Reddedildi', renk: '#9A8F80', adim: 0 },
   iptal: { ad: 'İptal edildi', renk: '#9A8F80', adim: 0 },
+  iade: { ad: 'Kargo iade döndü', renk: '#B5423A', adim: 0 },
 };
 export const AKTIF_TALEP = ['bekliyor', 'kabul', 'kargoda'];
 

@@ -8,7 +8,8 @@ import {
 } from 'firebase/auth';
 import {
   initializeFirestore, persistentLocalCache, collection, doc, getDoc, setDoc, updateDoc, deleteDoc,
-  onSnapshot, query, where, orderBy, limit, writeBatch,
+  onSnapshot, query, where, orderBy, limit, writeBatch, serverTimestamp, getDocs, getCountFromServer,
+  arrayUnion, arrayRemove,
 } from 'firebase/firestore';
 import { getAI, getGenerativeModel, GoogleAIBackend } from 'firebase/ai';
 import { Capacitor } from '@capacitor/core';
@@ -152,7 +153,15 @@ export async function adresimiGetir(uid) {
 export const adresimiKaydet = (uid, adres) => setDoc(doc(db, 'kullanicilar', uid, 'ozel', 'adres'), adres);
 
 // ——— Kitaplar ———
-const listele = (s) => s.docs.map((d) => ({ id: d.id, ...d.data() }));
+// Sunucu zaman damgaları (kabul, kargo, sorun) uygulamada milisaniye olarak kullanılır
+const ms = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : v);
+function belge(d) {
+  const v = { id: d.id, ...d.data({ serverTimestamps: 'estimate' }) };
+  for (const a of ['kabulTarihi', 'kargoTarihi', 'kayit', 'sonIhtar', 'tarih']) if (v[a]) v[a] = ms(v[a]);
+  if (v.sorun?.tarih) v.sorun = { ...v.sorun, tarih: ms(v.sorun.tarih) };
+  return v;
+}
+const listele = (s) => s.docs.map(belge);
 
 export function kitaplariDinle(cb, hata) {
   const q = query(collection(db, 'kitaplar'), orderBy('olusturma', 'desc'), limit(250));
@@ -193,7 +202,53 @@ export function talepleriDinle(uid, cb, hata) {
   return () => { k1(); k2(); };
 }
 
+// ——— Hesap: puan (ver-al dengesi) ve ihtarlar ———
+const hesapRef = (uid) => doc(db, 'hesaplar', uid);
+const BASLANGIC = { puan: 2, ihtar: 0 };
+
+// Oturum açılınca: hesap yoksa 2 puanla açılır
+export async function hesapHazirla(uid) {
+  const s = await getDoc(hesapRef(uid));
+  if (s.exists()) return belge(s);
+  await setDoc(hesapRef(uid), { ...BASLANGIC, kayit: serverTimestamp(), son: '' });
+  return { ...BASLANGIC, kayit: Date.now() };
+}
+export function hesabiDinle(uid, cb) {
+  return onSnapshot(hesapRef(uid), (s) => s.exists() && cb(belge(s)), () => {});
+}
+export async function hesapGetir(uid) {
+  const s = await getDoc(hesapRef(uid));
+  return s.exists() ? belge(s) : { ...BASLANGIC };
+}
+// İşlemle birlikte hesaba puan/ihtar değişikliği yazar (kurallar bu eşleşmeyi zorunlu tutar)
+async function hesabaYaz(b, uid, son, { puan = 0, ihtar = 0 } = {}) {
+  const s = await getDoc(hesapRef(uid));
+  const o = s.exists() ? s.data() : BASLANGIC;
+  const v = { puan: o.puan + puan, ihtar: o.ihtar + ihtar, son };
+  if (ihtar > 0) v.sonIhtar = serverTimestamp();
+  if (s.exists()) b.update(hesapRef(uid), v);
+  else b.set(hesapRef(uid), v);
+}
+
+// Cep telefonu → 5xxxxxxxxx (bir numara yalnızca bir hesapta kullanılabilir)
+export function telKimligi(tel) {
+  const r = String(tel || '').replace(/\D/g, '').replace(/^(90|0)/, '');
+  return /^5\d{9}$/.test(r) ? r : '';
+}
+
 export async function talepOlustur(kullanici, profil, kitap, not, adres) {
+  const telKimlik = telKimligi(adres.telefon);
+  if (!telKimlik) throw { code: 'okudum/telefon-gecersiz' };
+  try {
+    await getDoc(doc(db, 'telefonlar', telKimlik));
+  } catch {
+    throw { code: 'okudum/telefon-baska-hesapta' };
+  }
+  const hesap = await getDoc(hesapRef(kullanici.uid));
+  if (!hesap.exists()) await hesapHazirla(kullanici.uid);
+  const puan = hesap.exists() ? hesap.data().puan : BASLANGIC.puan;
+  if (puan < 1) throw { code: 'okudum/puan-yok' };
+
   const talepRef = doc(collection(db, 'talepler'));
   const b = writeBatch(db);
   b.set(talepRef, {
@@ -215,7 +270,9 @@ export async function talepOlustur(kullanici, profil, kitap, not, adres) {
     guncelleme: Date.now(),
   });
   // Adres ayrı belgede: kitap sahibi bunu yalnızca talebi kabul ettikten sonra okuyabilir.
-  b.set(doc(db, 'talepler', talepRef.id, 'gizli', 'adres'), adres);
+  b.set(doc(db, 'talepler', talepRef.id, 'gizli', 'adres'), { ...adres, telKimlik });
+  b.set(doc(db, 'telefonlar', telKimlik), { uid: kullanici.uid });
+  b.update(hesapRef(kullanici.uid), { puan: puan - 1, son: talepRef.id });
   await b.commit();
   return talepRef.id;
 }
@@ -228,28 +285,34 @@ export async function talepAdresi(talepId) {
 const talepRef = (id) => doc(db, 'talepler', id);
 const kitapRef = (id) => doc(db, 'kitaplar', id);
 
+// Kabul edilir; aynı kitabın diğer bekleyen talepleri tek tek reddedilir (puanları iade edilir).
 export async function talepKabul(talep, digerBekleyenler) {
   const b = writeBatch(db);
-  b.update(talepRef(talep.id), { durum: 'kabul', guncelleme: Date.now() });
-  b.update(kitapRef(talep.kitapId), { durum: 'rezerve' });
-  for (const t of digerBekleyenler) b.update(talepRef(t.id), { durum: 'red', guncelleme: Date.now() });
+  b.update(talepRef(talep.id), { durum: 'kabul', kabulTarihi: serverTimestamp(), guncelleme: Date.now() });
+  b.update(kitapRef(talep.kitapId), { durum: 'rezerve', talepId: talep.id });
   await b.commit();
+  for (const t of digerBekleyenler) await talepReddet(t).catch(() => {});
 }
-export const talepReddet = (talep) => writeBatch(db).update(talepRef(talep.id), { durum: 'red', guncelleme: Date.now() }).commit();
-export const talepIptal = (talep) => writeBatch(db).update(talepRef(talep.id), { durum: 'iptal', guncelleme: Date.now() }).commit();
-
-export async function talepGeriCek(talep) {
+// Reddet / iptal: talep edenin harcadığı puan geri verilir.
+async function puanIadeli(talep, durumu, ek = () => {}) {
   const b = writeBatch(db);
-  b.update(talepRef(talep.id), { durum: 'red', guncelleme: Date.now() });
-  b.update(kitapRef(talep.kitapId), { durum: 'musait' });
+  b.update(talepRef(talep.id), { durum: durumu, guncelleme: Date.now() });
+  await hesabaYaz(b, talep.isteyenId, talep.id, { puan: 1 });
+  ek(b);
   await b.commit();
 }
+export const talepReddet = (talep) => puanIadeli(talep, 'red');
+// Bekleyen talebi geri çekme ya da 7 gün kargolanmayan kabulden vazgeçme
+export const talepIptal = (talep) => puanIadeli(talep, 'iptal', (b) => {
+  if (talep.durum === 'kabul' && talep.kabulTarihi) b.update(kitapRef(talep.kitapId), { durum: 'musait' });
+});
+export const talepGeriCek = (talep) => puanIadeli(talep, 'red', (b) => b.update(kitapRef(talep.kitapId), { durum: 'musait' }));
 
 // nereden: kitap sahibinin şehri. Kargoya verilince herkese açık, kişi bilgisi içermeyen bir "yolculuk" kaydı açılır
 // (Haftanın yolculukları bölümü bunları gösterir).
 export async function kargola(talep, firma, takipNo, nereden) {
   const b = writeBatch(db);
-  b.update(talepRef(talep.id), { durum: 'kargoda', kargo: { firma, takipNo }, guncelleme: Date.now() });
+  b.update(talepRef(talep.id), { durum: 'kargoda', kargo: { firma, takipNo }, kargoTarihi: serverTimestamp(), guncelleme: Date.now() });
   b.update(kitapRef(talep.kitapId), { durum: 'verildi' });
   if (nereden && talep.isteyenSehir) {
     b.set(doc(db, 'yolculuklar', talep.id), {
@@ -260,11 +323,77 @@ export async function kargola(talep, firma, takipNo, nereden) {
   }
   await b.commit();
 }
+// Teslim aldım: gönderene 1 puan. Daha önce "ulaşmadı" bildirildiyse o ihtar geri alınır.
 export async function teslimAldim(talep) {
-  await writeBatch(db).update(talepRef(talep.id), { durum: 'teslim', guncelleme: Date.now() }).commit();
+  const b = writeBatch(db);
+  b.update(talepRef(talep.id), { durum: 'teslim', guncelleme: Date.now() });
+  const geriAl = talep.sorun?.tur === 'ulasmadi';
+  if (geriAl) b.delete(doc(db, 'ihtarlar', `${talep.id}_s`));
+  await hesabaYaz(b, talep.sahipId, talep.id, { puan: 1, ihtar: geriAl ? -1 : 0 });
+  await b.commit();
   // Eski talepler için yolculuk kaydı olmayabilir; yoksa sessizce geç.
   await updateDoc(doc(db, 'yolculuklar', talep.id), { teslim: true, teslimTarih: Date.now() }).catch(() => {});
 }
+// Kargodan 14 gün sonra itirazsız kalan gönderi: kitap sahibi tarafında teslim edilmiş sayılır.
+export async function otomatikTeslim(talep) {
+  const b = writeBatch(db);
+  b.update(talepRef(talep.id), { durum: 'teslim', guncelleme: Date.now() });
+  await hesabaYaz(b, talep.sahipId, talep.id, { puan: 1 });
+  await b.commit();
+  await updateDoc(doc(db, 'yolculuklar', talep.id), { teslim: true, teslimTarih: Date.now() }).catch(() => {});
+}
+// Kitap sahibi: kargo teslim alınmadan geri döndü → talep edene ihtar; kitap yeniden rafa
+export async function iadeDondu(talep) {
+  const b = writeBatch(db);
+  b.update(talepRef(talep.id), { durum: 'iade', guncelleme: Date.now() });
+  b.set(doc(db, 'ihtarlar', `${talep.id}_i`), { talepId: talep.id, verenId: talep.sahipId, hedefId: talep.isteyenId, tur: 'iade', tarih: serverTimestamp() });
+  await hesabaYaz(b, talep.isteyenId, talep.id, { ihtar: 1 });
+  await b.commit();
+  await updateDoc(kitapRef(talep.kitapId), { durum: 'musait' }).catch(() => {});
+}
+// Talep eden: sorun bildirimi → kitap sahibine ihtar. tur: ulasmadi | tahsilat | bos
+export async function sorunBildir(talep, tur) {
+  const b = writeBatch(db);
+  b.update(talepRef(talep.id), { sorun: { tur, tarih: serverTimestamp() }, guncelleme: Date.now() });
+  b.set(doc(db, 'ihtarlar', `${talep.id}_s`), { talepId: talep.id, verenId: talep.isteyenId, hedefId: talep.sahipId, tur, tarih: serverTimestamp() });
+  await hesabaYaz(b, talep.sahipId, talep.id, { ihtar: 1 });
+  await b.commit();
+}
+
+// ——— Değerlendirme ———
+export const degerlendir = (talep, yildiz, uygun, yorum) => setDoc(doc(db, 'degerlendirmeler', talep.id), {
+  sahipId: talep.sahipId, isteyenId: talep.isteyenId, yildiz, uygun, yorum: yorum || '', tarih: serverTimestamp(),
+});
+export async function degerlendirildiMi(talepId) {
+  const s = await getDoc(doc(db, 'degerlendirmeler', talepId)).catch(() => null);
+  return !!s?.exists();
+}
+// Gönderenin ortalama puanı
+export async function sahipPuani(uid) {
+  const s = await getDocs(query(collection(db, 'degerlendirmeler'), where('sahipId', '==', uid), limit(200)));
+  const l = s.docs.map((d) => d.data());
+  if (!l.length) return { ort: 0, adet: 0, uygun: 0 };
+  return { ort: l.reduce((t, d) => t + d.yildiz, 0) / l.length, adet: l.length, uygun: l.filter((d) => d.uygun).length / l.length };
+}
+
+// ——— Güven kartı: talep edenin geçmişi ———
+export async function guvenBilgisi(uid) {
+  const y = collection(db, 'yolculuklar');
+  const say = (alan) => getCountFromServer(query(y, where(alan, '==', uid), where('teslim', '==', true))).then((r) => r.data().count).catch(() => 0);
+  const [hesap, profil, paylasti, aldi] = await Promise.all([hesapGetir(uid).catch(() => ({ ...BASLANGIC })), profilGetir(uid).catch(() => null), say('sahipId'), say('isteyenId')]);
+  return { puan: hesap.puan, ihtar: hesap.ihtar, kayit: hesap.kayit || profil?.olusturma || 0, paylasti, aldi };
+}
+
+// ——— Engel ve şikâyet ———
+const engelRef = (uid) => doc(db, 'kullanicilar', uid, 'ozel', 'engel');
+export async function engelleriGetir(uid) {
+  const s = await getDoc(engelRef(uid)).catch(() => null);
+  return s?.exists() ? s.data().uidler || [] : [];
+}
+export const engelle = (uid, hedef, ekle) => setDoc(engelRef(uid), { uidler: ekle ? arrayUnion(hedef) : arrayRemove(hedef) }, { merge: true });
+export const sikayetEt = (verenId, hedefTur, hedefId, sebep, aciklama) => setDoc(doc(collection(db, 'sikayetler')), {
+  verenId, hedefTur, hedefId, sebep, aciklama: aciklama || '', tarih: serverTimestamp(),
+});
 
 export function yolculuklariDinle(cb, hata) {
   const q = query(collection(db, 'yolculuklar'), orderBy('tarih', 'desc'), limit(500));

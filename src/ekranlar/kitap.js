@@ -9,6 +9,8 @@ import { gecisReklami } from '../reklam.js';
 import { ozetiHazirla } from '../ozetAkisi.js';
 import { talepHakkiAl, odulKullan, haftalikTalepler } from '../talepHakki.js';
 import { sesCal } from '../ses.js';
+import { kitabiPaylas } from '../paylas.js';
+import { sikayetSayfasi } from '../sikayet.js';
 
 export function kitapEkrani(kok, { parca }) {
   const id = parca[0];
@@ -46,7 +48,7 @@ export function kitapEkrani(kok, { parca }) {
       ${k.foto ? `<div class="detay-arka"><img class="detay-bulanik" src="${h(k.foto)}" alt=""/></div>` : ''}
       <div class="detay-ust">
         <button class="yuvarlak cam" data-geri aria-label="Geri">${ikon('geri', 22)}</button>
-        <button class="yuvarlak cam" id="k-paylas" aria-label="Paylaş">${ikon('gonder', 20)}</button>
+        <button class="yuvarlak cam" id="k-paylas" aria-label="Kitabı birine tavsiye et">${ikon('paylas', 20)}</button>
       </div>
       <div class="detay-kapak">${kapak(k, 'buyuk')}</div>
     </section>
@@ -55,15 +57,16 @@ export function kitapEkrani(kok, { parca }) {
         <span class="etiket">${h(k.kategori)}</span>
         <span class="etiket" style="--e:${kd.renk}"><i class="nokta" style="background:${kd.renk}"></i>${h(kd.ad)}</span>
         ${k.sehir ? `<span class="etiket">${ikon('konum', 14)}${h(k.sehir)}</span>` : ''}
+        ${k.elden > 1 ? `<span class="etiket gezgin">${ikon('rota', 14)}Gezgin kitap · ${k.elden}. okur</span>` : ''}
       </div>
       <h1 class="detay-ad">${h(k.ad)}</h1>
       <p class="detay-yazar">${h(k.yazar)}</p>
-      ${k.aciklama ? `<blockquote class="detay-not">${h(k.aciklama)}</blockquote>` : ''}
+      ${k.aciklama ? `<blockquote class="detay-not"><span class="tirnak">“</span>${h(k.aciklama.trim())}<span class="tirnak">”</span></blockquote>` : ''}
       ${ozetBlogu(k, benim)}
 
       <a class="sahip-kart" ${benim ? '' : `data-git="kisi/${h(k.sahipId)}"`}>
         ${avatar(k.sahipAd, k.sahipFoto, 48)}
-        <div><span class="kucuk-etiket">${benim ? 'Senin rafından' : 'Kitabın sahibi'}</span><b>${h(k.sahipAd)}</b><span>${sahipKitapSayisi} kitap paylaştı · ${zamanOnce(k.olusturma)} ekledi</span></div>
+        <div><span class="kucuk-etiket">${benim ? 'Senin rafından' : 'Kitabın sahibi'}</span><b>${h(k.sahipAd)}</b><span>${sahipKitapSayisi} kitap paylaştı · ${zamanOnce(k.olusturma)} ekledi</span><span class="sahip-puan" id="k-sahip-puan"></span></div>
         ${benim ? '' : ikon('sag', 20)}
       </a>
 
@@ -75,6 +78,7 @@ export function kitapEkrani(kok, { parca }) {
           <li><i>${ikon('kargo', 18)}</i><div><b>Kargo</b><span>Kitap sana <u>karşı ödemeli</u> gönderilir; yalnızca kargo ücretini ödersin.</span></div></li>
         </ol>
       </div>
+      ${benim ? '' : `<button class="bildir-bag" id="k-bildir">${ikon('bildir', 14)}<span>Bu ilanı bildir</span></button>`}
     </section>
     ${alt}`;
 
@@ -95,17 +99,24 @@ export function kitapEkrani(kok, { parca }) {
         geri('profil');
       } catch (e) { toast(hataMetni(e), 'hata'); }
     });
-    $('#k-paylas', kok).addEventListener('click', async () => {
-      const metin = `"${k.ad}" (${k.yazar}) Okudum'da yeni okurunu bekliyor. Sen de oku! 📚`;
-      try {
-        if (navigator.share) await navigator.share({ title: 'Okudum', text: metin });
-        else { await navigator.clipboard.writeText(metin); toast('Panoya kopyalandı.', 'basari'); }
-      } catch {}
-    });
+    $('#k-paylas', kok).addEventListener('click', () => kitabiPaylas(k));
+    $('#k-bildir', kok)?.addEventListener('click', () => sikayetSayfasi('kitap', k.id, k.ad));
+    sahipPuaniYaz(k.sahipId, $('#k-sahip-puan', kok));
   };
 
   ciz();
   return { guncelle: () => { const y = kok.scrollTop; ciz(); kok.scrollTop = y; } };
+}
+
+// Gönderenin değerlendirme ortalaması (★ 4,8 · 12 değerlendirme)
+const puanOnbellek = new Map();
+export async function sahipPuaniYaz(uid, el) {
+  if (!el) return;
+  try {
+    if (!puanOnbellek.has(uid)) puanOnbellek.set(uid, await api.sahipPuani(uid));
+    const p = puanOnbellek.get(uid);
+    if (p.adet && el.isConnected) el.innerHTML = `${ikon('yildiz', 13)} <b>${p.ort.toLocaleString('tr-TR', { maximumFractionDigits: 1 })}</b> · ${p.adet} değerlendirme`;
+  } catch {}
 }
 
 async function talepSayfasi(k) {
@@ -119,7 +130,7 @@ async function talepSayfasi(k) {
         <textarea name="not" rows="2" maxlength="300" placeholder="Bu kitabı neden okumak istediğini anlatabilirsin…"></textarea></label>
       <div class="form-ara-baslik">${ikon('paket', 18)} Teslimat adresi</div>
       <label class="alan"><span>Ad Soyad</span><input name="adSoyad" autocomplete="name" value="${h(a.adSoyad || '')}" required/></label>
-      <label class="alan"><span>Telefon</span><input name="telefon" type="tel" inputmode="tel" autocomplete="tel" placeholder="05xx xxx xx xx" value="${h(a.telefon || '')}" required/></label>
+      <label class="alan"><span>Cep telefonu</span><input name="telefon" type="tel" inputmode="tel" autocomplete="tel" placeholder="05xx xxx xx xx" value="${h(a.telefon || '')}" required/></label>
       <div class="alan-ikili">
         <label class="alan"><span>İl</span><select name="il" required><option value="">Seç</option>${ILLER.map((i) => `<option ${i === a.il ? 'selected' : ''}>${i}</option>`).join('')}</select></label>
         <label class="alan"><span>İlçe</span><input name="ilce" value="${h(a.ilce || '')}" required/></label>
@@ -127,6 +138,8 @@ async function talepSayfasi(k) {
       <label class="alan"><span>Açık adres</span><textarea name="acikAdres" rows="2" placeholder="Mahalle, cadde/sokak, bina ve daire no" required>${h(a.acikAdres || '')}</textarea></label>
       <label class="onay-kutu"><input type="checkbox" name="kaydet" checked/><span>Bu adresi sonraki talepler için hatırla</span></label>
       <div class="uyari-kutu">${ikon('kalkan', 20)}<p>Adresin yalnızca kitabın sahibi talebini <b>kabul ettiğinde</b> ona gösterilir. Kitap <b>karşı ödemeli</b> gönderilir: teslim alırken kargo ücretini ödersin, kitap ücretsizdir.</p></div>
+      <div class="uyari-kutu dikkat">${ikon('uyari', 20)}<p>Kargocuya <b>yalnızca kargo ücretini</b> ödersin. Kapıda ek bir tahsilat (ürün bedeli) istenirse paketi <b>teslim alma</b> ve uygulamadan bildir.</p></div>
+      <div class="puan-bilgi">${ikon('puan', 18)}<span>Bu talep <b>1 puan</b> harcar · Kalan puanın: <b>${Math.max(0, (durum.hesap.puan ?? 2) - 1)}</b></span></div>
       <button class="dugme ana genis buyuk" type="submit">${ikon('gonder', 20)}<span>Talebi gönder</span></button>
     </form>`, { sinif: 'uzun' });
 
@@ -138,7 +151,7 @@ async function talepSayfasi(k) {
       ilce: f.ilce.value.trim(), acikAdres: f.acikAdres.value.trim(),
     };
     if (Object.values(adres).some((v) => !v)) return toast('Teslimat için tüm adres alanlarını doldur.', 'hata');
-    if (adres.telefon.replace(/\D/g, '').length < 10) return toast('Telefon numarası eksik görünüyor.', 'hata');
+    if (!api.telKimligi(adres.telefon)) return toast('Cep telefonu numaranı 05xx xxx xx xx biçiminde yaz.', 'hata');
     const b = $('button[type=submit]', f);
     yukleniyor(b, true);
     try {
