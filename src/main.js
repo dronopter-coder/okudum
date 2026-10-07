@@ -20,6 +20,7 @@ import { dogrulaEkrani } from './ekranlar/dogrula.js';
 import { haritaEkrani } from './ekranlar/harita.js';
 import { yolculuklarEkrani } from './ekranlar/yolculuklar.js';
 import { yildizlarEkrani } from './ekranlar/yildizlar.js';
+import { yonetimEkrani } from './ekranlar/yonetim.js';
 
 const ROTALAR = {
   giris: { ekran: girisEkrani, acik: true, koyu: true },
@@ -35,6 +36,7 @@ const ROTALAR = {
   ekle: { ekran: ekleEkrani },
   kisi: { ekran: kisiEkrani },
   'profil-duzenle': { ekran: profilDuzenleEkrani },
+  yonetim: { ekran: yonetimEkrani },
 };
 
 let aktif = null; // { ad, ekran örneği }
@@ -42,6 +44,7 @@ let kitapAboneligi = null;
 let talepAboneligi = null;
 let yolculukAboneligi = null;
 let hesapAboneligi = null;
+let sikayetAboneligi = null;
 
 function cozumle() {
   const [yol, sorgu = ''] = location.hash.replace(/^#\/?/, '').split('?');
@@ -127,6 +130,7 @@ function abonelikleriKapat() {
   talepAboneligi?.(); talepAboneligi = null;
   yolculukAboneligi?.(); yolculukAboneligi = null;
   hesapAboneligi?.(); hesapAboneligi = null;
+  sikayetAboneligi?.(); sikayetAboneligi = null;
 }
 
 // Kargodan 14 gün sonra itirazsız kalan gönderilerim teslim edilmiş sayılır (puanım yazılır)
@@ -146,6 +150,18 @@ function verileriDinle(uid) {
   hesapAboneligi = api.hesabiDinle(uid, (h) => { durum.hesap = h; degisti('hesap'); });
   api.hesapHazirla(uid).then((h) => { durum.hesap = h; degisti('hesap'); }).catch(() => {});
   api.engelleriGetir(uid).then((l) => { durum.engel = new Set(l); kitaplariSuz(); degisti('kitaplar'); }).catch(() => {});
+  // Yönetici: açık şikâyet sayısı (profilde rozet) ve yeni şikâyet uyarısı
+  if (durum.yonetici) {
+    let ilk = true;
+    sikayetAboneligi = api.sikayetleriDinle((l) => {
+      const acik = l.filter((x) => !x.incelendi).length;
+      if (!ilk && acik > (durum.acikSikayet || 0)) toast('Yeni bir şikâyet var. Profil › Yönetici paneli', 'hata');
+      ilk = false;
+      durum.acikSikayet = acik;
+      degisti('sikayet');
+    }, () => {});
+  }
+  api.askidakileriGetir().then((l) => { durum.askidakiler = new Set(l); kitaplariSuz(); degisti('kitaplar'); }).catch(() => {});
   kitapAboneligi = api.kitaplariDinle((liste) => {
     durum.tumKitaplar = liste;
     kitaplariSuz();
@@ -198,6 +214,7 @@ function baslat() {
     onceki = imza;
     abonelikleriKapat();
     durum.kullanici = k;
+    durum.yonetici = api.yoneticiMi(k);
     durum.kitaplar = []; durum.gelen = []; durum.giden = []; durum.yolculuklar = []; durum.kitaplarHazir = false;
     if (k && !k.dogrulandi) {
       durum.profil = null; // doğrulanana kadar veriye erişim yok

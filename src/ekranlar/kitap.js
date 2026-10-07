@@ -11,6 +11,7 @@ import { talepHakkiAl, odulKullan, haftalikTalepler } from '../talepHakki.js';
 import { sesCal } from '../ses.js';
 import { kitabiPaylas } from '../paylas.js';
 import { sikayetSayfasi } from '../sikayet.js';
+import { yoneticiCubugu, yoneticiKitapKaldir, yoneticiAskiDegistir } from './yonetim.js';
 
 export function kitapEkrani(kok, { parca }) {
   const id = parca[0];
@@ -79,6 +80,7 @@ export function kitapEkrani(kok, { parca }) {
         </ol>
       </div>
       ${benim ? '' : `<button class="bildir-bag" id="k-bildir">${ikon('bildir', 14)}<span>Bu ilanı bildir</span></button>`}
+      ${benim ? '' : yoneticiCubugu(`<button class="dugme tehlike kucuk" id="k-y-kaldir">${ikon('cop', 16)}<span>Kitabı kaldır</span></button><button class="dugme ikincil kucuk" id="k-y-aski">${ikon('engel', 16)}<span>${durum.askidakiler.has(k.sahipId) ? 'Askıyı kaldır' : 'Sahibini askıya al'}</span></button>`)}
     </section>
     ${alt}`;
 
@@ -101,6 +103,8 @@ export function kitapEkrani(kok, { parca }) {
     });
     $('#k-paylas', kok).addEventListener('click', () => kitabiPaylas(k));
     $('#k-bildir', kok)?.addEventListener('click', () => sikayetSayfasi('kitap', k.id, k.ad));
+    $('#k-y-kaldir', kok)?.addEventListener('click', async () => { if (await yoneticiKitapKaldir(k.id, k.ad)) geri(); });
+    $('#k-y-aski', kok)?.addEventListener('click', () => yoneticiAskiDegistir(k.sahipId, k.sahipAd));
     sahipPuaniYaz(k.sahipId, $('#k-sahip-puan', kok));
   };
 

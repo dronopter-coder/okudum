@@ -73,6 +73,7 @@ export function profilEkrani(kok) {
     </section>
 
     <section class="ayar-liste">
+      ${durum.yonetici ? `<button data-git="yonetim" class="yonetici-satir">${ikon('kalkan', 20)}<span>Yönetici paneli</span>${durum.acikSikayet ? `<em class="rozet-sayi">${durum.acikSikayet}</em>` : ''}${ikon('sag', 18)}</button>` : ''}
       <button data-git="yildizlar">${ikon('kupa', 20)}<span>Ayın yıldızları</span>${ikon('sag', 18)}</button>
       <button data-git="profil-duzenle">${ikon('kalem', 20)}<span>Profili düzenle</span>${ikon('sag', 18)}</button>
       <button id="p-ses" role="switch" aria-checked="${sesAcikMi()}">${ikon('ses', 20)}<span>Uyarı sesleri</span><i class="anahtar ${sesAcikMi() ? 'acik' : ''}"></i></button>

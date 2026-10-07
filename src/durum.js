@@ -12,8 +12,12 @@ export const durum = {
   hesap: { puan: 2, ihtar: 0 }, // ver-al puanı ve ihtarlar
   engel: new Set(), // engellenen kullanıcılar (kitapları görünmez, talep edemezler)
   tumKitaplar: [], // engel süzgecinden önceki liste
+  askidakiler: new Set(), // yöneticinin askıya aldığı hesaplar (kitapları rafta görünmez)
+  yonetici: false,
 };
-export const kitaplariSuz = () => { durum.kitaplar = durum.tumKitaplar.filter((k) => !durum.engel.has(k.sahipId)); };
+export const kitaplariSuz = () => {
+  durum.kitaplar = durum.tumKitaplar.filter((k) => !durum.engel.has(k.sahipId) && (!durum.askidakiler.has(k.sahipId) || k.sahipId === durum.kullanici?.uid));
+};
 
 const aboneler = new Set();
 export function abone(cb) {

@@ -3,7 +3,7 @@ import { durum, kitaplariSuz, degisti } from './durum.js';
 import { api } from './veri/index.js';
 import { h, ikon, $, $$, sayfaAc, toast, hataMetni, yukleniyor, onayla, titret } from './ui.js';
 
-const SEBEPLER = {
+export const SEBEPLER = {
   kitap: [['alakasiz', 'Kitap değil ya da fotoğraf alakasız'], ['satis', 'Satış ya da ücret istiyor'], ['uygunsuz', 'Uygunsuz içerik'], ['diger', 'Başka bir sebep']],
   kisi: [['gondermedi', 'Kitabı göndermedi'], ['tahsilat', 'Ek ücret / tahsilat istedi'], ['davranis', 'Kaba ya da rahatsız edici'], ['sahte', 'Sahte hesap'], ['diger', 'Başka bir sebep']],
 };

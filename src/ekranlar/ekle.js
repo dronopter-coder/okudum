@@ -3,13 +3,17 @@ import { durum } from '../durum.js';
 import { api } from '../veri/index.js';
 import { h, ikon, $, $$, kapak, toast, hataMetni, yukleniyor, fotoKucult, titret, onayla } from '../ui.js';
 import { KATEGORILER, KONDISYONLAR } from '../sabitler.js';
-import { ustBar } from './ortak.js';
+import { ustBar, bosDurum } from './ortak.js';
 import { git } from '../yon.js';
 import { gecisReklami } from '../reklam.js';
 import { ozetiHazirla } from '../ozetAkisi.js';
 import { fotoAl as fotoGetir } from '../foto.js';
 
 export function ekleEkrani(kok) {
+  if (durum.hesap?.askida) {
+    kok.innerHTML = `${ustBar('Rafına kitap ekle')}${bosDurum('kalkan', 'Hesabın askıya alındı', 'Bu sürede kitap ekleyemezsin. Bir yanlışlık olduğunu düşünüyorsan eroglu2141@gmail.com adresine yaz.')}`;
+    return {};
+  }
   // "Okudum, rafa koy": teslim alınan kitap ad, yazar ve fotoğrafıyla hazır gelir
   const taslak = durum.eklemeTaslagi;
   durum.eklemeTaslagi = null;

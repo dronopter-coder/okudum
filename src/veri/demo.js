@@ -398,6 +398,27 @@ export async function guvenBilgisi(uid) {
   };
 }
 
+// ——— Yönetici (demo: Google ile giren demo kullanıcısı yöneticidir) ———
+export const YONETICI_EPOSTA = 'demo@okudum.app';
+export const yoneticiMi = (k) => !!k && k.eposta === YONETICI_EPOSTA;
+export function sikayetleriDinle(cb) {
+  const d = () => cb([...(veri.sikayetler || [])].sort((a, b) => b.tarih - a.tarih));
+  dinleyiciler.sikayet ||= new Set();
+  dinleyiciler.sikayet.add(d);
+  setTimeout(d, 0);
+  return () => dinleyiciler.sikayet.delete(d);
+}
+const sikayetYayinla = () => dinleyiciler.sikayet?.forEach((d) => d());
+export async function sikayetIsaretle(id, incelendi) {
+  const x = (veri.sikayetler || []).find((y) => y.id === id);
+  if (x) x.incelendi = incelendi;
+  kaydet(); sikayetYayinla();
+}
+export async function kitapKaldir(kitapId) { await bekle(); veri.kitaplar = veri.kitaplar.filter((k) => k.id !== kitapId); kaydet(); }
+export async function askiyaAl(uid, askida) { await bekle(); Object.assign(hesap(uid), { askida, askiTarih: Date.now() }); kaydet(); }
+export async function askidakileriGetir() { return Object.entries(veri.puanlar || {}).filter(([, h]) => h.askida).map(([u]) => u); }
+export async function kitapGetir(id) { return kitapBul(id) || null; }
+
 // ——— Engel ve şikâyet ———
 export async function engelleriGetir(uid) { return veri.engeller?.[uid] || []; }
 export async function engelle(uid, hedef, ekle) {
@@ -407,7 +428,11 @@ export async function engelle(uid, hedef, ekle) {
   veri.engeller[uid] = [...l];
   kaydet();
 }
-export async function sikayetEt() { await bekle(); }
+export async function sikayetEt(verenId, hedefTur, hedefId, sebep, aciklama) {
+  await bekle();
+  (veri.sikayetler ||= []).push({ id: 's' + Date.now(), verenId, hedefTur, hedefId, sebep, aciklama, tarih: Date.now() });
+  kaydet(); sikayetYayinla();
+}
 
 export function yolculuklariDinle(cb) {
   dinleyiciler.yolculuk.add(cb);

@@ -31,6 +31,10 @@ const tarihYaz = (ms) => new Date(ms).toLocaleDateString('tr-TR', { day: 'numeri
 // true → talep formu açılabilir. Sıra: ihtar cezası → puan → haftalık sınır (2. talep reklamla)
 export async function talepHakkiAl() {
   const hs = durum.hesap || { puan: 2, ihtar: 0 };
+  if (hs.askida) {
+    bilgiSayfasi('kalkan', 'Hesabın askıya alındı', 'Topluluk kurallarına aykırı bir durum nedeniyle hesabın askıya alındı; bu sürede kitap isteyemez ve ekleyemezsin. Bir yanlışlık olduğunu düşünüyorsan <a href="mailto:eroglu2141@gmail.com">eroglu2141@gmail.com</a> adresine yaz.');
+    return false;
+  }
   if (hs.ihtar >= 3) {
     bilgiSayfasi('engel', 'Talep hakkın kapatıldı', 'Hesabına <b>3 ihtar</b> yazıldığı için yeni kitap isteyemiyorsun. Bir yanlışlık olduğunu düşünüyorsan <a href="mailto:eroglu2141@gmail.com">eroglu2141@gmail.com</a> adresine yaz.');
     return false;

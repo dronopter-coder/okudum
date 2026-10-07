@@ -5,6 +5,7 @@ import { kitapKarti, bosDurum, ustBar } from './ortak.js';
 import { profilleriYukle, profilBilgisi } from './yildizlar.js';
 import { sikayetSayfasi, engelliMi, engelDegistir } from '../sikayet.js';
 import { sahipPuaniYaz } from './kitap.js';
+import { yoneticiCubugu, yoneticiAskiDegistir } from './yonetim.js';
 
 export function kisiEkrani(kok, { parca }) {
   const uid = parca[0];
@@ -28,6 +29,7 @@ export function kisiEkrani(kok, { parca }) {
         <h1>${h(ad)}</h1>
         <p>${sehir ? `${ikon('konum', 15)} ${h(sehir)}` : ''}</p>
         <span class="sahip-puan" id="ks-puan"></span>
+        ${durum.yonetici && durum.askidakiler.has(uid) ? `<div class="ipucu dikkat">${ikon('kalkan', 18)}<span>Bu hesap askıda: kitap ekleyemez, kitap isteyemez.</span></div>` : ''}
         ${engelliMi(uid) ? `<div class="ipucu dikkat">${ikon('engel', 18)}<span>Bu okuru engelledin. Kitaplarını görmüyorsun ve senin kitaplarını isteyemez.</span></div>` : ''}
         <div class="istatistik kucuk">
           <div class="ist"><b>${rafta.length}</b><span>Rafında</span></div>
@@ -40,9 +42,11 @@ export function kisiEkrani(kok, { parca }) {
       ${uid !== durum.kullanici.uid ? `<div class="kisi-eylem">
         <button class="bildir-bag" id="ks-bildir">${ikon('bildir', 14)}<span>Bildir</span></button>
         <button class="bildir-bag" id="ks-engel">${ikon('engel', 14)}<span>${engelliMi(uid) ? 'Engeli kaldır' : 'Engelle'}</span></button>
-      </div>` : ''}` : bosDurum('kisi', 'Okur bulunamadı', '')}`;
+      </div>
+      ${yoneticiCubugu(`<button class="dugme ${durum.askidakiler.has(uid) ? 'ikincil' : 'tehlike'} kucuk" id="ks-y-aski">${ikon('kalkan', 16)}<span>${durum.askidakiler.has(uid) ? 'Askıyı kaldır' : 'Hesabı askıya al'}</span></button>`)}` : ''}` : bosDurum('kisi', 'Okur bulunamadı', '')}`;
     sahipPuaniYaz(uid, kok.querySelector('#ks-puan'));
     kok.querySelector('#ks-bildir')?.addEventListener('click', () => sikayetSayfasi('kisi', uid, ad));
+    kok.querySelector('#ks-y-aski')?.addEventListener('click', async () => { if (await yoneticiAskiDegistir(uid, ad)) ciz(); });
     kok.querySelector('#ks-engel')?.addEventListener('click', async () => { if (await engelDegistir(uid, ad)) ciz(); });
 
     kok.querySelector('#ks-paylasti')?.addEventListener('click', () => { titret(); gonderilenleriGoster(ad, gonderilen); });

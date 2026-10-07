@@ -384,6 +384,25 @@ export async function guvenBilgisi(uid) {
   return { puan: hesap.puan, ihtar: hesap.ihtar, kayit: hesap.kayit || profil?.olusturma || 0, paylasti, aldi };
 }
 
+// ——— Yönetici ———
+export const YONETICI_EPOSTA = 'ebabiltasarim@gmail.com';
+export const yoneticiMi = (k) => !!k && (k.eposta || '').toLowerCase() === YONETICI_EPOSTA;
+export function sikayetleriDinle(cb, hata) {
+  const q = query(collection(db, 'sikayetler'), orderBy('tarih', 'desc'), limit(200));
+  return onSnapshot(q, (s) => cb(listele(s)), hata);
+}
+export const sikayetIsaretle = (id, incelendi) => updateDoc(doc(db, 'sikayetler', id), { incelendi });
+export const kitapKaldir = (kitapId) => deleteDoc(doc(db, 'kitaplar', kitapId));
+export const askiyaAl = (uid, askida) => updateDoc(hesapRef(uid), { askida, askiTarih: serverTimestamp() });
+export async function askidakileriGetir() {
+  const s = await getDocs(query(collection(db, 'hesaplar'), where('askida', '==', true), limit(500)));
+  return s.docs.map((d) => d.id);
+}
+export async function kitapGetir(id) {
+  const s = await getDoc(doc(db, 'kitaplar', id)).catch(() => null);
+  return s?.exists() ? belge(s) : null;
+}
+
 // ——— Engel ve şikâyet ———
 const engelRef = (uid) => doc(db, 'kullanicilar', uid, 'ozel', 'engel');
 export async function engelleriGetir(uid) {

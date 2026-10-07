@@ -23,6 +23,10 @@ service cloud.firestore {
         && getAfter(hesapYolu(uid)).data.puan == hesapOnce(uid).puan + 1
         && getAfter(hesapYolu(uid)).data.son == talepId;
     }
+    // Yönetici: uygulamadaki yönetici paneli yalnızca bu hesapla çalışır
+    function yonetici() { return girisli() && request.auth.token.email == 'ebabiltasarim@gmail.com'; }
+    // Yöneticinin askıya aldığı hesaplar kitap ekleyemez ve talep gönderemez
+    function askida(uid) { return exists(hesapYolu(uid)) && get(hesapYolu(uid)).data.get('askida', false) == true; }
     // Sunucu zamanı alanı; eski kayıtlarda yoksa son güncelleme zamanı
     function zaman(t, alan) { return t.get(alan, timestamp.value(t.guncelleme)); }
 
@@ -49,6 +53,9 @@ service cloud.firestore {
         && request.resource.data.puan == 2 && request.resource.data.ihtar == 0
         && request.resource.data.kayit == request.time && request.resource.data.son == '';
       allow create, update: if girisli() && hesapDegisimi(uid);
+      // Yönetici: askıya alma / askıyı kaldırma
+      allow update: if yonetici() && degisen().hasOnly(['askida', 'askiTarih'])
+        && request.resource.data.askida is bool && request.resource.data.askiTarih == request.time;
 
       function hesapDegisimi(uid) {
         let o = hesapOnce(uid);
@@ -121,6 +128,7 @@ service cloud.firestore {
     match /kitaplar/{kitapId} {
       allow read: if girisli();
       allow create: if ben(request.resource.data.sahipId)
+        && !askida(request.auth.uid)
         && request.resource.data.durum == 'musait'
         && metin(request.resource.data.ad, 120)
         && metin(request.resource.data.yazar, 80)
@@ -140,7 +148,7 @@ service cloud.firestore {
         && resource.data.durum == 'rezerve' && request.resource.data.durum == 'musait'
         && getAfter(talepYolu(resource.data.talepId)).data.isteyenId == request.auth.uid
         && getAfter(talepYolu(resource.data.talepId)).data.durum == 'iptal';
-      allow delete: if ben(resource.data.sahipId);
+      allow delete: if ben(resource.data.sahipId) || yonetici();
     }
 
     // ——— Talepler ———
@@ -163,6 +171,7 @@ service cloud.firestore {
         && getAfter(hesapYolu(request.auth.uid)).data.puan == get(hesapYolu(request.auth.uid)).data.puan - 1
         && getAfter(hesapYolu(request.auth.uid)).data.son == talepId
         && cezasiz(get(hesapYolu(request.auth.uid)).data)
+        && get(hesapYolu(request.auth.uid)).data.get('askida', false) != true
         && !engelli(request.resource.data.sahipId);
 
       // 3 ihtar: talep hakkı kapanır. 2 ihtar: son ihtardan sonraki 30 gün talep yapılamaz.
@@ -259,6 +268,8 @@ service cloud.firestore {
 
     // ——— Şikâyetler: yalnızca yazılır (Firebase konsolundan incelenir) ———
     match /sikayetler/{id} {
+      allow read: if yonetici();
+      allow update: if yonetici() && degisen().hasOnly(['incelendi']) && request.resource.data.incelendi is bool;
       allow create: if ben(request.resource.data.verenId)
         && request.resource.data.keys().hasOnly(['verenId', 'hedefTur', 'hedefId', 'sebep', 'aciklama', 'tarih'])
         && request.resource.data.hedefTur in ['kitap', 'kisi']
