@@ -950,3 +950,5 @@ button.profil-avatar .foto-rozet { width: 28px; height: 28px; right: -2px; botto
 .yn-liste li a { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
 .yn-liste li a > div { display: flex; flex-direction: column; }
 .yn-liste li span { font-size: 12.5px; color: var(--murekkep-3); }
+.bilgi-kart.dokunulur { cursor: pointer; } .bilgi-kart.dokunulur:active { transform: scale(.98); } .yolculuk-kahraman[data-gunluk] { cursor: pointer; } .ara-bas { display: flex; align-items: center; gap: 12px; } .ara-bas h1 { margin: 0; }
+#gunluk { scroll-margin-top: calc(var(--ust, 0px) + 70px); }

@@ -47,6 +47,14 @@ export async function talepHakkiAl() {
     bilgiSayfasi('puan', 'Puanın kalmadı', 'Okudum\'da kitaplar <b>ver-al dengesiyle</b> dolaşır: her talep 1 puan harcar, gönderdiğin her kitap yeni okuruna ulaşınca 1 puan kazanırsın. Rafına bir kitap ekle; biri isteyip teslim aldığında yeniden kitap isteyebilirsin.', true);
     return false;
   }
+  // İlk talep serbest; sonrakiler için rafta en az bir kitabı olmalı (önce paylaş, sonra iste)
+  const uid = durum.kullanici?.uid;
+  const talepSayisi = durum.giden.filter((t) => t.durum !== 'red' && t.durum !== 'iptal').length;
+  const kitabiVar = durum.tumKitaplar.some((k) => k.sahipId === uid) || durum.gelen.length > 0;
+  if (talepSayisi >= 1 && !kitabiVar) {
+    bilgiSayfasi('raf', 'Önce rafına bir kitap ekle', 'İlk kitabını isteyebildin! 🎉 Yeni bir kitap isteyebilmek için rafına <b>en az bir kitap</b> eklemelisin. Okudum, okurların birbirine kitap verdiği bir topluluk; paylaştıkça herkesin rafı zenginleşir.', true);
+    return false;
+  }
   const liste = haftalikTalepler();
   if (liste.length === 0) return true;
   if (liste.length >= HAFTALIK_SINIR) {

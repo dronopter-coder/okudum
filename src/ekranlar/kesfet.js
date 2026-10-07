@@ -65,7 +65,7 @@ export function kesfetEkrani(kok) {
     ${yolculukKarti()}
     ${yildizKartiHtml()}
 
-    <section class="bilgi-kart">
+    <section class="bilgi-kart ${yolda > 0 ? 'dokunulur' : ''}" ${yolda > 0 ? 'data-git="yolculuklar?bolum=gunluk"' : ''}>
       <div>
         <b>${yolda > 0 ? `${yolda} kitap yeni okuruna yol aldı` : 'Nasıl çalışır?'}</b>
         <p>Kitap ücretsiz, kargo karşı ödemeli: kitabı isteyen, teslim alırken yalnızca kargo ücretini öder.</p>

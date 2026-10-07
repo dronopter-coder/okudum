@@ -24,7 +24,7 @@ service cloud.firestore {
         && getAfter(hesapYolu(uid)).data.son == talepId;
     }
     // Yönetici: uygulamadaki yönetici paneli yalnızca bu hesapla çalışır
-    function yonetici() { return girisli() && request.auth.token.email == 'ebabiltasarim@gmail.com'; }
+    function yonetici() { return girisli() && request.auth.token.email == 'eroglu2141@gmail.com'; }
     // Yöneticinin askıya aldığı hesaplar kitap ekleyemez ve talep gönderemez
     function askida(uid) { return exists(hesapYolu(uid)) && get(hesapYolu(uid)).data.get('askida', false) == true; }
     // Sunucu zamanı alanı; eski kayıtlarda yoksa son güncelleme zamanı

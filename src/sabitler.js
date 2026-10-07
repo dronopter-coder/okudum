@@ -1,8 +1,11 @@
-export const KATEGORILER = [
-  'Roman', 'Türk Klasikleri', 'Dünya Klasikleri', 'Bilim Kurgu', 'Polisiye', 'Tarih',
-  'Felsefe', 'Psikoloji', 'Bilim', 'Kişisel Gelişim', 'Şiir', 'Çocuk', 'Gençlik',
-  'Biyografi', 'Ders & Sınav', 'Diğer',
-];
+// İlk üç tür sabit; gerisi Türkçe alfabeye göre ("Diğer" en sonda)
+const ONCE = ['Türk Klasikleri', 'Dünya Klasikleri', 'Roman'];
+const DIGERLERI = [
+  'Akademik', 'Bilgisayar', 'Bilim', 'Bilim Kurgu', 'Biyografi', 'Çocuk', 'Ders & Sınav', 'Din', 'Ekonomi',
+  'Felsefe', 'Gençlik', 'Kişisel Gelişim', 'Polisiye', 'Psikoloji', 'Sağlık', 'Seyahatname', 'Siyaset',
+  'Sosyoloji', 'Şehir Kitapları', 'Şiir', 'Tarih',
+].sort((a, b) => a.localeCompare(b, 'tr'));
+export const KATEGORILER = [...ONCE, ...DIGERLERI, 'Diğer'];
 
 export const KONDISYONLAR = [
   { id: 'yeni', ad: 'Yeni gibi', renk: '#3F6B57' },

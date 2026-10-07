@@ -385,7 +385,7 @@ export async function guvenBilgisi(uid) {
 }
 
 // ——— Yönetici ———
-export const YONETICI_EPOSTA = 'ebabiltasarim@gmail.com';
+export const YONETICI_EPOSTA = 'eroglu2141@gmail.com';
 export const yoneticiMi = (k) => !!k && (k.eposta || '').toLowerCase() === YONETICI_EPOSTA;
 export function sikayetleriDinle(cb, hata) {
   const q = query(collection(db, 'sikayetler'), orderBy('tarih', 'desc'), limit(200));

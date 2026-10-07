@@ -10,7 +10,7 @@ const sayi = (n) => n.toLocaleString('tr-TR');
 export function haftaninYolculuklari() {
   const sinir = Date.now() - HAFTA;
   return durum.yolculuklar
-    .filter((y) => y.tarih >= sinir && ILLER.has(y.nereden) && ILLER.has(y.nereye) && y.nereden !== y.nereye)
+    .filter((y) => y.tarih >= sinir && ILLER.has(y.nereden) && ILLER.has(y.nereye))
     .map((y) => ({ ...y, km: mesafeKm(y.nereden, y.nereye) }));
 }
 
@@ -22,14 +22,16 @@ export function ozet(liste) {
     liste.forEach((y) => m.set(y[alan], (m.get(y[alan]) || 0) + 1));
     return [...m.entries()].sort((a, b) => b[1] - a[1])[0] || null;
   };
-  const enUzun = [...liste].sort((a, b) => b.km - a.km)[0] || null;
+  const enUzun = [...liste].filter((y) => y.km > 0).sort((a, b) => b.km - a.km)[0] || null;
   return { adet: liste.length, km, sehir: sehirler.size, enUzun, gonderen: say('nereden'), alan: say('nereye') };
 }
 
 // Animasyonlu rota haritası: kavisli yollar çizilir, üzerlerinde küçük kitaplar yol alır.
 export function rotaHaritasi(liste, { mini = false } = {}) {
-  const yollar = liste.slice(0, mini ? 8 : 24);
-  const noktalar = new Set(yollar.flatMap((y) => [y.nereden, y.nereye]));
+  // Aynı şehir içindeki gönderimler için yay çizilmez; o şehir haritada nokta olarak işaretlenir
+  const yollar = liste.filter((y) => y.nereden !== y.nereye).slice(0, mini ? 8 : 24);
+  const sehirIci = liste.filter((y) => y.nereden === y.nereye).slice(0, 12);
+  const noktalar = new Set([...yollar.flatMap((y) => [y.nereden, y.nereye]), ...sehirIci.map((y) => y.nereye)]);
   const ek = `
     <defs>
       <linearGradient id="rota-renk" x1="0" x2="1"><stop offset="0" stop-color="#F0B43C"/><stop offset="1" stop-color="#E8643A"/></linearGradient>
@@ -55,13 +57,13 @@ export function rotaHaritasi(liste, { mini = false } = {}) {
   }).join('')}
     ${[...noktalar].map((ad) => {
     const il = ILLER.get(ad);
-    const varis = yollar.some((y) => y.nereye === ad);
+    const varis = yollar.some((y) => y.nereye === ad) || sehirIci.some((y) => y.nereye === ad);
     return `<g class="durak ${varis ? 'varis' : ''}" transform="translate(${il.x} ${il.y})"><circle r="18" class="durak-dalga"/><circle r="8" class="durak-nokta"/>${mini ? '' : `<text y="-20">${h(ad)}</text>`}</g>`;
   }).join('')}`;
   return haritaSvg({ ek, svgSinif: `gece ${mini ? 'mini' : ''}` });
 }
 
-export function yolculuklarEkrani(kok) {
+export function yolculuklarEkrani(kok, { sorgu = {} } = {}) {
   const ciz = () => {
     const liste = haftaninYolculuklari();
     const o = ozet(liste);
@@ -73,7 +75,7 @@ export function yolculuklarEkrani(kok) {
 
     kok.innerHTML = `
       ${ustBar('Haftanın yolculukları')}
-      <section class="yolculuk-kahraman">
+      <section class="yolculuk-kahraman" ${o.adet ? 'data-gunluk' : ''}>
         <div class="yk-bas"><span class="kucuk-etiket acik">${ikon('rota', 13)} ${tarih}</span>
           <h1>${o.adet ? `Bu hafta <em>${o.adet} kitap</em> yeni okuruna yol aldı` : 'Bu hafta yollar sessiz'}</h1></div>
         <div class="yk-harita">${rotaHaritasi(liste)}</div>
@@ -108,7 +110,7 @@ export function yolculuklarEkrani(kok) {
         </div>
       </section>
 
-      <section class="bolum">
+      <section class="bolum" id="gunluk">
         <div class="bolum-bas"><h2>Yolculuk günlüğü</h2><span class="sayac">${o.adet} kayıt</span></div>
         <ol class="gunluk">
           ${liste.map((y) => `<li class="${y.teslim ? 'ulasti' : 'yolda'}" ${y.kitapId ? `data-git="kitap/${h(y.kitapId)}"` : ''}>
@@ -116,7 +118,7 @@ export function yolculuklarEkrani(kok) {
             <div class="gunluk-bilgi">
               <b>${h(y.kitapAd)}</b>
               <span class="gunluk-rota">${h(y.nereden)} <i>${ikon('sag', 14)}</i> ${h(y.nereye)}</span>
-              <span class="gunluk-meta">${sayi(y.km)} km · ${zamanOnce(y.tarih)}</span>
+              <span class="gunluk-meta">${y.nereden === y.nereye ? 'şehir içi' : `${sayi(y.km)} km`} · ${zamanOnce(y.tarih)}</span>
             </div>
             <span class="gunluk-durum">${y.teslim ? `${ikon('tik', 14, 2.6)} Ulaştı` : `${ikon('kargo', 14)} Yolda`}</span>
           </li>`).join('')}
@@ -126,7 +128,11 @@ export function yolculuklarEkrani(kok) {
 
     sayilariCanlandir(kok);
   };
+  const gunlugeIn = () => kok.querySelector('#gunluk')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  kok.addEventListener('click', (e) => { if (e.target.closest('[data-gunluk]')) gunlugeIn(); });
   ciz();
+  // Keşfet'teki kartla gelindiyse doğrudan yolculuk günlüğüne in
+  if (sorgu.bolum === 'gunluk') setTimeout(gunlugeIn, 350);
   return { guncelle: (n) => n === 'yolculuklar' && ciz() };
 }
 

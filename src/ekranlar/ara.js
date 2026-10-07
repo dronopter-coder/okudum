@@ -10,7 +10,7 @@ export function araEkrani(kok, { sorgu }) {
   const f = { metin: '', kategori: sorgu.kategori || '', sehir: '' };
 
   kok.innerHTML = `
-    <header class="sayfa-bas"><h1>Keşfet & ara</h1></header>
+    <header class="sayfa-bas ara-bas"><button class="yuvarlak" data-geri aria-label="Geri">${ikon('geri', 22)}</button><h1>Keşfet & ara</h1></header>
     <label class="arama-kutu">${ikon('ara', 20)}<input id="a-metin" type="search" placeholder="Kitap, yazar ya da tür ara…" autocomplete="off" enterkeyhint="search"/></label>
     <div class="filtre-satir">
       <label class="secici">${ikon('konum', 16)}<select id="a-sehir"><option value="">Tüm Türkiye</option>${ILLER.map((i) => `<option>${i}</option>`).join('')}</select></label>
