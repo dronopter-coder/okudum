@@ -7,9 +7,27 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { sesCal } from './ses.js';
 import { toast } from './ui.js';
 import { takasTamamlandi } from './paylas.js';
+import { BackgroundRunner } from '@capacitor/background-runner';
+import { api } from './veri/index.js';
 
 const KANAL = 'okudum_takas';
 const YEREL = Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('LocalNotifications');
+// Uygulama kapalıyken ~30 dk'da bir çalışan arka plan kontrolü (src/arkaplan.js)
+const ARKA = Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('BackgroundRunner');
+const ETIKET = 'com.okudum.app.kontrol';
+function arkaplanaBildir(cikis = false) {
+  if (!ARKA) return;
+  const b = cikis ? null : api.arkaPlanBilgisi?.();
+  BackgroundRunner.dispatchEvent({ label: ETIKET, event: 'ayarla', details: b ? { ...b, durumlar: gecmis || {} } : {} }).catch(() => {});
+}
+// Uygulama açılınca: arka planda bildirilmiş gelişmeleri bilinen say (aynı bildirim iki kez gelmesin)
+async function arkaplandanAl() {
+  if (!ARKA || !anahtar || !gecmis) return;
+  try {
+    const r = await BackgroundRunner.dispatchEvent({ label: ETIKET, event: 'durumAl', details: {} });
+    if (r?.durumlar) { gecmis = { ...gecmis, ...r.durumlar }; kaydet(); }
+  } catch { /* yok */ }
+}
 let onPlanda = !document.hidden;
 let hazir = false;
 let gecmis = null; // talepId → bilinen son durum
@@ -91,7 +109,11 @@ export async function bildirimleriBaslat(uid, { dokununca } = {}) {
   hazir = true;
   document.addEventListener('visibilitychange', () => { onPlanda = !document.hidden; });
   if (!YEREL) return;
-  App.addListener('appStateChange', ({ isActive }) => { onPlanda = isActive; });
+  App.addListener('appStateChange', ({ isActive }) => {
+    onPlanda = isActive;
+    if (isActive) arkaplandanAl(); else arkaplanaBildir();
+  });
+  arkaplanaBildir();
   try {
     await LocalNotifications.createChannel({
       id: KANAL, name: 'Takas bildirimleri', description: 'Kitap talepleri, onaylar ve kargo haberleri',
@@ -108,6 +130,7 @@ export async function bildirimleriBaslat(uid, { dokununca } = {}) {
 }
 
 export function bildirimleriSifirla() {
+  arkaplanaBildir(true);
   gecmis = null;
   anahtar = '';
 }

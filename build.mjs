@@ -33,8 +33,11 @@ const css = {
   assetNames: 'fonts/[name]-[hash]',
 };
 
+// Arka plan kontrolü (Background Runner): web görünümü dışında çalışır, tek dosya ve modülsüz olmalı
+const arkaplan = { ...ortak, entryPoints: { kontrol: 'src/arkaplan.js' }, outdir: 'www/runners', format: 'iife', minify: false };
+
 if (process.argv.includes('--watch')) {
-  for (const o of [js, css]) await (await esbuild.context(o)).watch();
+  for (const o of [js, css, arkaplan]) await (await esbuild.context(o)).watch();
 } else {
-  await Promise.all([esbuild.build(js), esbuild.build(css)]);
+  await Promise.all([esbuild.build(js), esbuild.build(css), esbuild.build(arkaplan)]);
 }

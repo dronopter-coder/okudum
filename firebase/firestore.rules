@@ -124,6 +124,13 @@ service cloud.firestore {
       allow update: if ben(resource.data.uid) && request.resource.data == resource.data;
     }
 
+    // ——— Kutu: kullanıcının son takas gelişmesinin zamanı (arka plan kontrolü yalnızca bunu okur) ———
+    match /kutular/{uid} {
+      allow read: if ben(uid);
+      allow create, update: if girisli() && request.resource.data.keys().hasOnly(['son'])
+        && request.resource.data.son == request.time;
+    }
+
     // ——— Kapak fotoğrafları (kitap listesini hafif tutmak için ayrı belgede) ———
     match /kapaklar/{kitapId} {
       allow read: if girisli();

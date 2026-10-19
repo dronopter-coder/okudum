@@ -17,7 +17,17 @@
     },
     "FirebaseAuthentication": {
       "skipNativeAuth": true,
-      "providers": ["google.com"]
+      "providers": [
+        "google.com"
+      ]
+    },
+    "BackgroundRunner": {
+      "label": "com.okudum.app.kontrol",
+      "src": "runners/kontrol.js",
+      "event": "kontrol",
+      "repeat": true,
+      "interval": 30,
+      "autoStart": true
     }
   }
 }

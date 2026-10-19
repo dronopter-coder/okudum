@@ -3,7 +3,7 @@ import { durum } from '../durum.js';
 import { demoMu } from '../veri/index.js';
 import { h, ikon, avatar, kapak, $ } from '../ui.js';
 import { KATEGORILER } from '../sabitler.js';
-import { kitapKarti, bosDurum, iskelet, logo, bulunma } from './ortak.js';
+import { kitapKarti, bosDurum, iskelet, logo, bulunma, rafSusu, SARMASIK } from './ortak.js';
 import { haftaninYolculuklari, ozet, rotaHaritasi } from './yolculuklar.js';
 import { yildizKartiHtml, yildizKartiniYenile } from './yildizlar.js';
 import { uygulamayiPaylas } from '../paylas.js';
@@ -47,19 +47,15 @@ export function kesfetEkrani(kok) {
     ${!durum.kitaplarHazir ? `<div class="izgara">${iskelet(4)}</div>` : musait.length === 0
     ? bosDurum('kitap', 'Raflar şimdilik boş', 'İlk kitabı sen paylaş, okuma zinciri senden başlasın!', '<button class="dugme ana" data-git="ekle">Kitap ekle</button>')
     : `
-    <section class="bolum">
-      <div class="bolum-bas"><h2>Rafa yeni gelenler</h2><button class="baglanti" data-git="ara">Tümü</button></div>
-      <div class="vitrin yatay-kaydir">
-        ${yeni.map((k) => `<a class="vitrin-kitap" data-git="kitap/${h(k.id)}">
-          ${kapak(k)}
-          <b>${h(k.ad)}</b><span>${h(k.yazar)}</span>
-        </a>`).join('')}
-      </div>
+    <section class="kitaplik">
+      ${SARMASIK}
+      <div class="bolum-bas"><h2>Rafa yeni gelenler</h2><button class="baglanti" data-git="ara">Tümü ›</button></div>
+      <div class="liste-yatay yatay-kaydir">${yeni.map((k) => kitapKarti(k, { genis: true })).join('')}${rafSusu()}</div>
     </section>
 
-    ${sehrim.length ? `<section class="bolum">
+    ${sehrim.length ? `<section class="kitaplik">
       <div class="bolum-bas"><h2>${ikon('konum', 18)} ${h(bulunma(p.sehir))} seni bekleyenler</h2></div>
-      <div class="liste-yatay yatay-kaydir">${sehrim.map((k) => kitapKarti(k, { genis: true })).join('')}</div>
+      <div class="liste-yatay yatay-kaydir">${sehrim.map((k) => kitapKarti(k, { genis: true })).join('')}${rafSusu()}</div>
     </section>` : ''}
 
     ${yolculukKarti()}
@@ -73,7 +69,7 @@ export function kesfetEkrani(kok) {
       <div class="bilgi-kart-ikon">${ikon('el', 30, 1.8)}</div>
     </section>
 
-    <section class="bolum">
+    <section class="kitaplik">
       <div class="bolum-bas"><h2>Tüm raf</h2><span class="sayac">${musait.length} kitap</span></div>
       <div class="izgara">${musait.map((k) => kitapKarti(k)).join('')}</div>
     </section>`}
@@ -92,10 +88,10 @@ export function kesfetEkrani(kok) {
       }
       if (neler !== 'kitaplar') return;
       const y = kok.scrollTop;
-      const vitrin = $('.vitrin', kok)?.scrollLeft;
+      const vitrin = $('.kitaplik .liste-yatay', kok)?.scrollLeft;
       ciz();
       kok.scrollTop = y;
-      if ($('.vitrin', kok) && vitrin) $('.vitrin', kok).scrollLeft = vitrin;
+      if ($('.kitaplik .liste-yatay', kok) && vitrin) $('.kitaplik .liste-yatay', kok).scrollLeft = vitrin;
     },
   };
 }

@@ -231,6 +231,16 @@ export function talepleriDinle(uid, cb, hata) {
   return () => { k1(); k2(); };
 }
 
+// ——— Kutu: karşı tarafın arka plan kontrolü için "yeni bir gelişme var" işareti (1 küçük yazma) ———
+const kutuyaYaz = (b, uid) => uid && b.set(doc(db, 'kutular', uid), { son: serverTimestamp() });
+
+// Arka plan kontrolünün oturum açabilmesi için (yalnızca bu cihazda saklanır)
+export function arkaPlanBilgisi() {
+  const u = auth?.currentUser;
+  if (!u) return null;
+  return { uid: u.uid, rt: u.refreshToken, key: app.options.apiKey, pid: app.options.projectId };
+}
+
 // ——— Hesap: puan (ver-al dengesi) ve ihtarlar ———
 const hesapRef = (uid) => doc(db, 'hesaplar', uid);
 const BASLANGIC = { puan: 2, ihtar: 0 };
@@ -310,6 +320,7 @@ export async function talepOlustur(kullanici, profil, kitap, not, adres) {
   b.set(doc(db, 'talepler', talepRef.id, 'gizli', 'adres'), { ...adres, telKimlik });
   b.set(doc(db, 'telefonlar', telKimlik), { uid: kullanici.uid });
   b.update(hesapRef(kullanici.uid), { puan: puan - 1, son: talepRef.id });
+  kutuyaYaz(b, kitap.sahipId);
   await b.commit();
   return talepRef.id;
 }
@@ -327,6 +338,7 @@ export async function talepKabul(talep, digerBekleyenler) {
   const b = writeBatch(db);
   b.update(talepRef(talep.id), { durum: 'kabul', kabulTarihi: serverTimestamp(), guncelleme: Date.now() });
   b.update(kitapRef(talep.kitapId), { durum: 'rezerve', talepId: talep.id });
+  kutuyaYaz(b, talep.isteyenId);
   await b.commit();
   for (const t of digerBekleyenler) await talepReddet(t).catch(() => {});
 }
@@ -336,6 +348,8 @@ async function puanIadeli(talep, durumu, ek = () => {}) {
   b.update(talepRef(talep.id), { durum: durumu, guncelleme: Date.now() });
   await hesabaYaz(b, talep.isteyenId, talep.id, { puan: 1 });
   ek(b);
+  // Red: talep edene, iptal: kitap sahibine haber
+  kutuyaYaz(b, durumu === 'iptal' ? talep.sahipId : talep.isteyenId);
   await b.commit();
 }
 export const talepReddet = (talep) => puanIadeli(talep, 'red');
@@ -351,6 +365,7 @@ export async function kargola(talep, firma, takipNo, nereden) {
   const b = writeBatch(db);
   b.update(talepRef(talep.id), { durum: 'kargoda', kargo: { firma, takipNo }, kargoTarihi: serverTimestamp(), guncelleme: Date.now() });
   b.update(kitapRef(talep.kitapId), { durum: 'verildi' });
+  kutuyaYaz(b, talep.isteyenId);
   if (nereden && talep.isteyenSehir) {
     b.set(doc(db, 'yolculuklar', talep.id), {
       kitapId: talep.kitapId, kitapAd: talep.kitapAd, kitapYazar: talep.kitapYazar || '', kitapFoto: '', kitapFotoVar: !!(talep.kitapFotoVar || talep.kitapFoto),
@@ -367,6 +382,7 @@ export async function teslimAldim(talep) {
   const geriAl = talep.sorun?.tur === 'ulasmadi';
   if (geriAl) b.delete(doc(db, 'ihtarlar', `${talep.id}_s`));
   await hesabaYaz(b, talep.sahipId, talep.id, { puan: 1, ihtar: geriAl ? -1 : 0 });
+  kutuyaYaz(b, talep.sahipId);
   await b.commit();
   // Eski talepler için yolculuk kaydı olmayabilir; yoksa sessizce geç.
   await updateDoc(doc(db, 'yolculuklar', talep.id), { teslim: true, teslimTarih: Date.now() }).catch(() => {});
@@ -385,6 +401,7 @@ export async function iadeDondu(talep) {
   b.update(talepRef(talep.id), { durum: 'iade', guncelleme: Date.now() });
   b.set(doc(db, 'ihtarlar', `${talep.id}_i`), { talepId: talep.id, verenId: talep.sahipId, hedefId: talep.isteyenId, tur: 'iade', tarih: serverTimestamp() });
   await hesabaYaz(b, talep.isteyenId, talep.id, { ihtar: 1 });
+  kutuyaYaz(b, talep.isteyenId);
   await b.commit();
   await updateDoc(kitapRef(talep.kitapId), { durum: 'musait' }).catch(() => {});
 }
@@ -394,6 +411,7 @@ export async function sorunBildir(talep, tur) {
   b.update(talepRef(talep.id), { sorun: { tur, tarih: serverTimestamp() }, guncelleme: Date.now() });
   b.set(doc(db, 'ihtarlar', `${talep.id}_s`), { talepId: talep.id, verenId: talep.isteyenId, hedefId: talep.sahipId, tur, tarih: serverTimestamp() });
   await hesabaYaz(b, talep.sahipId, talep.id, { ihtar: 1 });
+  kutuyaYaz(b, talep.sahipId);
   await b.commit();
 }
 

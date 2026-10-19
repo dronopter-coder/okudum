@@ -29,6 +29,17 @@ jobs:
           echo "OKUDUM_GOOGLE_SERVICES_JSON tanımlı değil: yerel Google girişi eklentisi APK'ya eklenmeyecek."
           npm uninstall @capacitor-firebase/authentication --no-audit --no-fund
       - run: npx cap add android
+      - name: Arka plan kontrolü (Background Runner) için JS motoru
+        run: |
+          python3 - <<'PY'
+          p='android/app/build.gradle'
+          s=open(p).read()
+          eski="dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'"
+          assert eski in s, 'flatDir bulunamadi'
+          s=s.replace(eski, eski + "\n        dirs '../../node_modules/@capacitor/background-runner/android/src/main/libs', 'libs'", 1)
+          open(p,'w').write(s)
+          PY
+          grep -n "background-runner" android/app/build.gradle
       - name: Firebase (google-services.json) ve Google girişi
         if: ${{ env.GOOGLE_SERVICES_JSON != '' }}
         run: |

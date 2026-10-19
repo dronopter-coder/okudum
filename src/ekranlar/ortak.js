@@ -24,6 +24,15 @@ export function kitapKarti(k, { genis = false } = {}) {
   </a>`;
 }
 
+// Yatay rafın sonunda süs: yan yana eski ciltler
+export const rafSusu = () => '<div class="kitap-kart susu" aria-hidden="true"><div class="kitap-kart-kapak"><div class="cilt-yigin"><i></i><i></i><i></i></div></div><div class="kitap-kart-bilgi"></div></div>';
+
+// Kitaplığın üst köşesinden sarkan sarmaşık
+export const SARMASIK = `<svg class="kitaplik-sarmasik" viewBox="0 0 64 150" aria-hidden="true">
+  <path d="M10 0 C 18 20, 6 34, 16 52 S 10 88, 20 104 S 14 130, 22 148" fill="none" stroke="#3E6B2E" stroke-width="2"/>
+  ${[[14, 10, -30], [6, 24, 25], [18, 36, -20], [8, 50, 30], [20, 62, -25], [10, 76, 20], [22, 90, -30], [12, 104, 25], [22, 118, -20], [14, 132, 30], [24, 144, -25]].map(([x, y, r], i) => `<ellipse cx="${x}" cy="${y}" rx="${7 - (i % 3)}" ry="${4.5 - (i % 2)}" transform="rotate(${r} ${x} ${y})" fill="${['#6FA046', '#5A8C38', '#88B858'][i % 3]}"/>`).join('')}
+</svg>`;
+
 export function bosDurum(ikonAd, baslik, metin, dugme = '') {
   return `<div class="bos">
     <div class="bos-ikon">${ikon(ikonAd, 30, 1.8)}</div>
