@@ -68,18 +68,63 @@ export function kapakRengi(kitap) {
   return PALETLER[ozet(kitap.ad + kitap.yazar) % PALETLER.length][0];
 }
 export function kapak(kitap, sinif = '') {
-  if (kitap.foto) {
-    return `<div class="kapak foto ${sinif}"><img src="${h(kitap.foto)}" alt="${h(kitap.ad)}" loading="lazy"/></div>`;
+  const foto = kitap.foto || (kitap.fotoVar && kapakOnbellek.get(kitap.id));
+  if (foto) {
+    return `<div class="kapak foto ${sinif}"><img src="${h(foto)}" alt="${h(kitap.ad)}" loading="lazy"/></div>`;
   }
+  // Fotoğraf ayrı belgede: önce üretilen kapak görünür, ekrana gelince fotoğraf bir kez indirilir
+  const bekle = kitap.fotoVar && kitap.id ? ` data-kapak="${h(kitap.id)}"` : '';
   const n = ozet(kitap.ad + kitap.yazar);
   const [bg, fg, vurgu] = PALETLER[n % PALETLER.length];
   const desen = ['bant', 'daire', 'serit', 'cerceve'][(n >> 4) % 4];
-  return `<div class="kapak uretilen desen-${desen} ${sinif}" style="--k-bg:${bg};--k-fg:${fg};--k-vurgu:${vurgu}">
+  return `<div class="kapak uretilen desen-${desen} ${sinif}"${bekle} style="--k-bg:${bg};--k-fg:${fg};--k-vurgu:${vurgu}">
     <span class="k-sus"></span>
     <span class="k-ad">${h(kitap.ad)}</span>
     <span class="k-yazar">${h(kitap.yazar)}</span>
   </div>`;
 }
+
+// ——— Kapak fotoğrafları: kitap listesini hafif tutmak için ayrı belgede durur ———
+// Yalnızca ekranda görünen kapaklar, her biri bir kez indirilir (sonrası bellek + cihaz önbelleği).
+const kapakOnbellek = new Map(); // kitapId → dataURL
+let kapakGetirici = null;
+export function kapakKaynagi(fn) { kapakGetirici = fn; }
+const istenen = new Map(); // kitapId → Promise
+function kapakIste(id) {
+  if (!istenen.has(id)) {
+    istenen.set(id, Promise.resolve(kapakGetirici?.(id)).then((foto) => {
+      if (foto) kapakOnbellek.set(id, foto);
+      return foto;
+    }).catch(() => null));
+  }
+  return istenen.get(id);
+}
+const kapakGozcu = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver((girdiler) => {
+  for (const g of girdiler) {
+    if (!g.isIntersecting) continue;
+    const el = g.target;
+    kapakGozcu.unobserve(el);
+    kapakIste(el.dataset.kapak).then((foto) => {
+      if (!foto || !el.isConnected) return;
+      el.className = el.className.replace(/\buretilen\b|\bdesen-\S+/g, '').trim() + ' foto';
+      el.removeAttribute('style');
+      el.removeAttribute('data-kapak');
+      el.innerHTML = `<img src="${h(foto)}" alt=""/>`;
+    });
+  }
+}, { rootMargin: '200px' }) : null;
+if (kapakGozcu && typeof MutationObserver !== 'undefined') {
+  let bekliyor = false;
+  new MutationObserver(() => {
+    if (bekliyor) return;
+    bekliyor = true;
+    requestAnimationFrame(() => {
+      bekliyor = false;
+      document.querySelectorAll('[data-kapak]:not([data-izleniyor])').forEach((el) => { el.dataset.izleniyor = '1'; kapakGozcu.observe(el); });
+    });
+  }).observe(document.documentElement, { childList: true, subtree: true });
+}
+export const kapakFotosu = (id) => kapakIste(id);
 
 export function avatar(ad, foto, boyut = 40) {
   if (foto) return `<img class="avatar" style="width:${boyut}px;height:${boyut}px" src="${h(foto)}" alt="" referrerpolicy="no-referrer"/>`;
@@ -99,7 +144,7 @@ export function zamanOnce(ms) {
 
 // ——— Toast ———
 let toastZaman;
-export function toast(mesaj, tur = 'bilgi') {
+export function toast(mesaj, tur = 'bilgi', sure = 5000) {
   let el = $('#toast');
   if (!el) {
     el = document.createElement('div');
@@ -111,11 +156,14 @@ export function toast(mesaj, tur = 'bilgi') {
   el.className = `toast t-${tur}`;
   el.innerHTML = `${ikon(tur === 'hata' ? 'x' : tur === 'basari' ? 'tik' : 'bilgi', 18, 2.5)}<span>${h(mesaj)}</span>`;
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('acik')));
-  toastZaman = setTimeout(() => {
+  const kapat = () => {
+    clearTimeout(toastZaman);
     el.classList.remove('acik');
     // Kayma animasyonu bitince tamamen kaldır: bazı telefonlarda ekranın üstünde yarım kalmasın.
     toastZaman = setTimeout(() => { el.hidden = true; }, 450);
-  }, 2800);
+  };
+  el.onclick = kapat; // dokununca hemen kapanır
+  toastZaman = setTimeout(kapat, sure);
 }
 
 // ——— Alt sayfa (bottom sheet) ———

@@ -1,7 +1,7 @@
 // Rafa kitap ekleme: fotoğraf, ad, yazar, tür, durum, not
 import { durum } from '../durum.js';
 import { api } from '../veri/index.js';
-import { h, ikon, $, $$, kapak, toast, hataMetni, yukleniyor, fotoKucult, titret, onayla } from '../ui.js';
+import { h, ikon, $, $$, kapak, kapakFotosu, toast, hataMetni, yukleniyor, fotoKucult, titret, onayla } from '../ui.js';
 import { KATEGORILER, KONDISYONLAR } from '../sabitler.js';
 import { ustBar, bosDurum } from './ortak.js';
 import { git } from '../yon.js';
@@ -68,6 +68,8 @@ export function ekleEkrani(kok) {
 
   const bosHal = $('#e-onizleme', kok).innerHTML;
   queueMicrotask(() => { if (foto) onizle(); });
+  // Rafa koy: önceki kitabın fotoğrafı ayrı belgedeyse getir
+  if (taslak && !foto && taslak.fotoVar) kapakFotosu(taslak.kitapId).then((f) => { if (f && !foto && kok.isConnected) { foto = f; onizle(); } });
   const onizle = () => {
     const ad = f.ad.value.trim() || 'Kitabın adı';
     const yazar = f.yazar.value.trim() || 'Yazar';

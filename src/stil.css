@@ -238,9 +238,26 @@ img.avatar { display: block; background: var(--kagit-2, #EFE4D2); }
 @media (min-width: 440px) { .izgara { grid-template-columns: repeat(3, 1fr); } }
 .kitap-kart { display: block; transition: transform .2s; }
 .kitap-kart:active { transform: scale(.97); }
-.kitap-kart-kapak { position: relative; padding: 14px 16px 0; background: var(--kagit-2); border-radius: var(--r-m); }
-.kitap-kart-kapak .kapak { transform: translateY(0); }
-.kitap-kart-kapak::after { content: ''; display: block; height: 14px; }
+/* Ahşap raf: koyu ceviz arka pano (dikey tahtalar) + kitabın üzerinde durduğu açık renkli raf tahtası */
+.kitap-kart-kapak {
+  position: relative; padding: 16px 16px 0; border-radius: var(--r-m); overflow: hidden;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(255, 214, 160, .16), transparent 60%),
+    linear-gradient(180deg, rgba(0, 0, 0, .28), transparent 22%),
+    repeating-linear-gradient(90deg, transparent 0 46px, rgba(0, 0, 0, .22) 46px 48px, rgba(255, 255, 255, .05) 48px 49px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .025) 0 2px, transparent 2px 7px, rgba(0, 0, 0, .04) 7px 9px),
+    linear-gradient(90deg, #5E3920, #70452A 30%, #63402A 55%, #74482B 80%, #5C3820);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18), 0 6px 14px -8px rgba(60, 30, 10, .55);
+}
+.kitap-kart-kapak .kapak { position: relative; z-index: 1; transform: translateY(0); box-shadow: 0 10px 14px -8px rgba(0, 0, 0, .65), 0 2px 4px rgba(0, 0, 0, .25); }
+.kitap-kart-kapak::after {
+  content: ''; position: relative; display: block; height: 16px; margin: 0 -16px;
+  background:
+    linear-gradient(180deg, rgba(255, 236, 200, .55) 0 1.5px, transparent 1.5px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, .05) 0 3px, transparent 3px 11px, rgba(255, 255, 255, .06) 11px 13px, transparent 13px 23px),
+    linear-gradient(180deg, #D39A5E 0%, #B97B44 45%, #8E5629 100%);
+  box-shadow: 0 -6px 10px -4px rgba(0, 0, 0, .45);
+}
 .kitap-kart-bilgi { padding: 10px 2px 0; display: flex; flex-direction: column; gap: 1px; }
 .kitap-kart-bilgi b { font-family: var(--serif); font-weight: 600; font-size: 15.5px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .kitap-kart-bilgi .yazar { font-size: 13px; color: var(--murekkep-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -251,7 +268,7 @@ img.avatar { display: block; background: var(--kagit-2, #EFE4D2); }
 .serit-durum.verildi { background: var(--zeytin); }
 .kitap-kart.genis { flex: none; width: 158px; scroll-snap-align: start; }
 .liste-yatay { padding-bottom: 8px; gap: 14px; }
-.iskelet .kitap-kart-kapak .kapak { box-shadow: none; background: linear-gradient(100deg, #E8DCC6 30%, #F3EADB 50%, #E8DCC6 70%); background-size: 300% 100%; animation: parla 1.3s linear infinite; }
+.iskelet .kitap-kart-kapak .kapak { box-shadow: none; opacity: .5; background: linear-gradient(100deg, #E8DCC6 30%, #F3EADB 50%, #E8DCC6 70%); background-size: 300% 100%; animation: parla 1.3s linear infinite; }
 .iskelet b, .iskelet span { height: 12px; border-radius: 6px; background: var(--kagit-2); margin-top: 6px; }
 .iskelet span { width: 60%; }
 @keyframes parla { to { background-position: -150% 0; } }

@@ -88,7 +88,7 @@ function kart(t, yon) {
 
   return `<article class="talep-kart durum-${t.durum}" data-id="${h(t.id)}">
     <div class="talep-ust">
-      <a class="talep-kapak" data-git="kitap/${h(t.kitapId)}">${kapak({ ad: t.kitapAd, yazar: t.kitapYazar, foto: t.kitapFoto }, 'mini')}</a>
+      <a class="talep-kapak" data-git="kitap/${h(t.kitapId)}">${kapak({ id: t.kitapId, ad: t.kitapAd, yazar: t.kitapYazar, foto: t.kitapFoto, fotoVar: t.kitapFotoVar }, 'mini')}</a>
       <div class="talep-bilgi">
         ${durumRozeti(t.durum)}
         <b>${h(t.kitapAd)}</b>
@@ -235,7 +235,7 @@ async function eylemYap(b, eylem, t) {
     case 'degerlendir':
       return degerlendirmeSayfasi(t);
     case 'rafa':
-      durum.eklemeTaslagi = { ad: t.kitapAd, yazar: t.kitapYazar || '', foto: t.kitapFoto || '', oncekiTalep: t.id, kitapId: t.kitapId };
+      durum.eklemeTaslagi = { ad: t.kitapAd, yazar: t.kitapYazar || '', foto: t.kitapFoto || '', fotoVar: !!t.kitapFotoVar, oncekiTalep: t.id, kitapId: t.kitapId };
       return git('ekle');
     case 'kargola':
       return kargoSayfasi(t);

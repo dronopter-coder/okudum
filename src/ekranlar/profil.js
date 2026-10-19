@@ -16,7 +16,7 @@ export function profilEkrani(kok) {
     const kisiFoto = gelen ? t.isteyenFoto : t.sahipFoto;
     const ulasti = t.durum === 'teslim';
     return `<li class="${ulasti ? 'ulasti' : 'yolda'}" data-git="kitap/${h(t.kitapId)}">
-      <div class="gunluk-kapak">${kapak({ ad: t.kitapAd, yazar: t.kitapYazar || '', foto: t.kitapFoto }, 'mini')}</div>
+      <div class="gunluk-kapak">${kapak({ id: t.kitapId, ad: t.kitapAd, yazar: t.kitapYazar || '', foto: t.kitapFoto, fotoVar: t.kitapFotoVar }, 'mini')}</div>
       <div class="gunluk-bilgi">
         <b>${h(t.kitapAd)}</b>
         <span class="kisi-ok">${avatar(kisiAd, kisiFoto, 20)}<span>${gelen ? 'Gönderdiğin okur:' : 'Gönderen:'} <b>${h(kisiAd)}</b>${gelen && t.isteyenSehir ? ` · ${h(t.isteyenSehir)}` : ''}</span></span>

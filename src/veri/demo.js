@@ -238,6 +238,9 @@ export async function kapakOku() {
   return { ad: 'Kürk Mantolu Madonna', yazar: 'Sabahattin Ali' };
 }
 
+export async function kapakGetir(id) { await bekle(200); return veri.kapaklar?.[id] || null; }
+export async function kapaklariTasi() {}
+
 export async function kitapSil(kitap) {
   veri.kitaplar = veri.kitaplar.filter((k) => k.id !== kitap.id);
   kaydet();

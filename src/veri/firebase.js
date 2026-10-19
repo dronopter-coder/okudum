@@ -8,7 +8,7 @@ import {
 } from 'firebase/auth';
 import {
   initializeFirestore, persistentLocalCache, collection, doc, getDoc, setDoc, updateDoc, deleteDoc,
-  onSnapshot, query, where, orderBy, limit, writeBatch, serverTimestamp, getDocs, getCountFromServer,
+  onSnapshot, query, where, orderBy, limit, writeBatch, serverTimestamp, getDocs, getCountFromServer, getDocFromCache,
   arrayUnion, arrayRemove,
 } from 'firebase/firestore';
 import { getAI, getGenerativeModel, GoogleAIBackend } from 'firebase/ai';
@@ -170,10 +170,13 @@ export function kitaplariDinle(cb, hata) {
 
 export async function kitapEkle(kullanici, profil, veri, fotoDataUrl) {
   const kitapRef = doc(collection(db, 'kitaplar'));
-  // Fotoğraf, ekleme ekranında ~560 px JPEG'e küçültülür (≈40-80 KB) ve doğrudan belgeye yazılır.
-  await setDoc(kitapRef, {
+  // Fotoğraf (~560 px JPEG) ayrı "kapaklar" belgesine yazılır; kitap listesi böylece hafif kalır,
+  // fotoğraf yalnızca ekranda göründüğünde ve bir kez indirilir.
+  const b = writeBatch(db);
+  b.set(kitapRef, {
     ...veri,
-    foto: fotoDataUrl || '',
+    foto: '',
+    fotoVar: !!fotoDataUrl,
     sahipId: kullanici.uid,
     sahipAd: profil.ad,
     sahipFoto: profil.foto || '',
@@ -181,11 +184,37 @@ export async function kitapEkle(kullanici, profil, veri, fotoDataUrl) {
     durum: 'musait',
     olusturma: Date.now(),
   });
+  if (fotoDataUrl) b.set(doc(db, 'kapaklar', kitapRef.id), { foto: fotoDataUrl, sahipId: kullanici.uid });
+  await b.commit();
   return kitapRef.id;
 }
 
+// Kapak fotoğrafı: önce cihazdaki önbellekten, yoksa sunucudan (bir kez)
+export async function kapakGetir(kitapId) {
+  const r = doc(db, 'kapaklar', kitapId);
+  try {
+    const c = await getDocFromCache(r);
+    if (c.exists()) return c.data().foto;
+  } catch { /* önbellekte yok */ }
+  const s = await getDoc(r).catch(() => null);
+  return s?.exists() ? s.data().foto : null;
+}
+
+// Eski kayıtlar: fotoğrafı kitap belgesinin içinde olan kendi kitaplarımı kapaklar'a taşı (bir kez)
+export async function kapaklariTasi(kitaplarim) {
+  for (const k of kitaplarim.filter((x) => x.foto && x.foto.startsWith('data:image/jpeg')).slice(0, 20)) {
+    const b = writeBatch(db);
+    b.set(doc(db, 'kapaklar', k.id), { foto: k.foto, sahipId: k.sahipId });
+    b.update(doc(db, 'kitaplar', k.id), { foto: '', fotoVar: true });
+    await b.commit().catch(() => {});
+  }
+}
+
 export async function kitapSil(kitap) {
-  await deleteDoc(doc(db, 'kitaplar', kitap.id));
+  const b = writeBatch(db);
+  b.delete(doc(db, 'kitaplar', kitap.id));
+  if (kitap.fotoVar) b.delete(doc(db, 'kapaklar', kitap.id));
+  await b.commit();
 }
 
 // ——— Talepler ———
@@ -213,8 +242,15 @@ export async function hesapHazirla(uid) {
   await setDoc(hesapRef(uid), { ...BASLANGIC, kayit: serverTimestamp(), son: '' });
   return { ...BASLANGIC, kayit: Date.now() };
 }
+// Tek okuma: hesap belgesi dinlenir; yoksa (yeni üye) 2 puanla açılır
 export function hesabiDinle(uid, cb) {
-  return onSnapshot(hesapRef(uid), (s) => s.exists() && cb(belge(s)), () => {});
+  let acildi = false;
+  return onSnapshot(hesapRef(uid), (s) => {
+    if (s.exists()) return cb(belge(s));
+    if (acildi || s.metadata.fromCache) return;
+    acildi = true;
+    setDoc(hesapRef(uid), { ...BASLANGIC, kayit: serverTimestamp(), son: '' }).catch(() => {});
+  }, () => {});
 }
 export async function hesapGetir(uid) {
   const s = await getDoc(hesapRef(uid));
@@ -256,6 +292,7 @@ export async function talepOlustur(kullanici, profil, kitap, not, adres) {
     kitapAd: kitap.ad,
     kitapYazar: kitap.yazar,
     kitapFoto: kitap.foto || '',
+    kitapFotoVar: !!kitap.fotoVar,
     sahipId: kitap.sahipId,
     sahipAd: kitap.sahipAd,
     sahipFoto: kitap.sahipFoto || '',
@@ -316,7 +353,7 @@ export async function kargola(talep, firma, takipNo, nereden) {
   b.update(kitapRef(talep.kitapId), { durum: 'verildi' });
   if (nereden && talep.isteyenSehir) {
     b.set(doc(db, 'yolculuklar', talep.id), {
-      kitapId: talep.kitapId, kitapAd: talep.kitapAd, kitapYazar: talep.kitapYazar || '', kitapFoto: talep.kitapFoto || '',
+      kitapId: talep.kitapId, kitapAd: talep.kitapAd, kitapYazar: talep.kitapYazar || '', kitapFoto: '', kitapFotoVar: !!(talep.kitapFotoVar || talep.kitapFoto),
       nereden, nereye: talep.isteyenSehir, sahipId: talep.sahipId, isteyenId: talep.isteyenId,
       tarih: Date.now(), teslim: false,
     });
@@ -392,7 +429,12 @@ export function sikayetleriDinle(cb, hata) {
   return onSnapshot(q, (s) => cb(listele(s)), hata);
 }
 export const sikayetIsaretle = (id, incelendi) => updateDoc(doc(db, 'sikayetler', id), { incelendi });
-export const kitapKaldir = (kitapId) => deleteDoc(doc(db, 'kitaplar', kitapId));
+export async function kitapKaldir(kitapId) {
+  const b = writeBatch(db);
+  b.delete(doc(db, 'kitaplar', kitapId));
+  b.delete(doc(db, 'kapaklar', kitapId));
+  await b.commit();
+}
 export const askiyaAl = (uid, askida) => updateDoc(hesapRef(uid), { askida, askiTarih: serverTimestamp() });
 export async function askidakileriGetir() {
   const s = await getDocs(query(collection(db, 'hesaplar'), where('askida', '==', true), limit(500)));

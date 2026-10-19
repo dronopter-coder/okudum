@@ -114,7 +114,7 @@ export function yolculuklarEkrani(kok, { sorgu = {} } = {}) {
         <div class="bolum-bas"><h2>Yolculuk günlüğü</h2><span class="sayac">${o.adet} kayıt</span></div>
         <ol class="gunluk">
           ${liste.map((y) => `<li class="${y.teslim ? 'ulasti' : 'yolda'}" ${y.kitapId ? `data-git="kitap/${h(y.kitapId)}"` : ''}>
-            <div class="gunluk-kapak">${kapak({ ad: y.kitapAd, yazar: y.kitapYazar || '', foto: y.kitapFoto }, 'mini')}</div>
+            <div class="gunluk-kapak">${kapak({ id: y.kitapId, ad: y.kitapAd, yazar: y.kitapYazar || '', foto: y.kitapFoto, fotoVar: y.kitapFotoVar }, 'mini')}</div>
             <div class="gunluk-bilgi">
               <b>${h(y.kitapAd)}</b>
               <span class="gunluk-rota">${h(y.nereden)} <i>${ikon('sag', 14)}</i> ${h(y.nereye)}</span>

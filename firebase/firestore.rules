@@ -124,6 +124,18 @@ service cloud.firestore {
       allow update: if ben(resource.data.uid) && request.resource.data == resource.data;
     }
 
+    // ——— Kapak fotoğrafları (kitap listesini hafif tutmak için ayrı belgede) ———
+    match /kapaklar/{kitapId} {
+      allow read: if girisli();
+      allow create: if ben(request.resource.data.sahipId)
+        && request.resource.data.keys().hasOnly(['foto', 'sahipId'])
+        && request.resource.data.foto is string
+        && request.resource.data.foto.matches('data:image/jpeg;base64,.*')
+        && request.resource.data.foto.size() < 300000
+        && getAfter(yol('kitaplar/' + kitapId)).data.sahipId == request.auth.uid;
+      allow delete: if yonetici() || ben(resource.data.sahipId);
+    }
+
     // ——— Kitaplar ———
     match /kitaplar/{kitapId} {
       allow read: if girisli();

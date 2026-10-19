@@ -2,7 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { api } from './veri/index.js';
 import { durum, degisti, abone, kitaplariSuz } from './durum.js';
-import { ikon, $, titret, toast, hataMetni, ustSayfayiKapat } from './ui.js';
+import { ikon, $, titret, toast, hataMetni, ustSayfayiKapat, kapakKaynagi } from './ui.js';
 import { git, geri, yiginiSifirla, tarayiciGeriGitti, rotalayiciAyarla } from './yon.js';
 import { App } from '@capacitor/app';
 import { reklamlariBaslat, bannerGoster } from './reklam.js';
@@ -145,10 +145,12 @@ function suresiDolanlar(gelen) {
   }
 }
 
+kapakKaynagi((id) => api.kapakGetir(id));
+
 function verileriDinle(uid) {
+  let tasindi = false;
   const hata = (e) => toast(hataMetni(e), 'hata');
   hesapAboneligi = api.hesabiDinle(uid, (h) => { durum.hesap = h; degisti('hesap'); });
-  api.hesapHazirla(uid).then((h) => { durum.hesap = h; degisti('hesap'); }).catch(() => {});
   api.engelleriGetir(uid).then((l) => { durum.engel = new Set(l); kitaplariSuz(); degisti('kitaplar'); }).catch(() => {});
   // Yönetici: açık şikâyet sayısı (profilde rozet) ve yeni şikâyet uyarısı
   if (durum.yonetici) {
@@ -165,6 +167,8 @@ function verileriDinle(uid) {
   kitapAboneligi = api.kitaplariDinle((liste) => {
     durum.tumKitaplar = liste;
     kitaplariSuz();
+    // Fotoğrafı eski usulle kitabın içinde duran kendi kitaplarımı bir kez kapaklar'a taşı
+    if (!tasindi) { tasindi = true; api.kapaklariTasi(liste.filter((k) => k.sahipId === uid)).catch(() => {}); }
     durum.kitaplarHazir = true;
     degisti('kitaplar');
   }, hata);

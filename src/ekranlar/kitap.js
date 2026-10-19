@@ -1,7 +1,7 @@
 // Kitap detayı ve "Bu kitabı iste" akışı
 import { durum, benimMi, kitapBul } from '../durum.js';
 import { api } from '../veri/index.js';
-import { h, ikon, avatar, kapak, kapakRengi, $, sayfaAc, toast, hataMetni, yukleniyor, onayla, titret, zamanOnce } from '../ui.js';
+import { h, ikon, avatar, kapak, kapakRengi, kapakFotosu, $, sayfaAc, toast, hataMetni, yukleniyor, onayla, titret, zamanOnce } from '../ui.js';
 import { kondisyon, KITAP_DURUM, AKTIF_TALEP, ILLER } from '../sabitler.js';
 import { bosDurum, durumRozeti } from './ortak.js';
 import { git, geri } from '../yon.js';
@@ -102,6 +102,15 @@ export function kitapEkrani(kok, { parca }) {
       } catch (e) { toast(hataMetni(e), 'hata'); }
     });
     $('#k-paylas', kok).addEventListener('click', () => kitabiPaylas(k));
+    // Fotoğraf ayrı belgedeyse arka plan bulanıklığını yükleyince ekle
+    if (!k.foto && k.fotoVar) {
+      kapakFotosu(k.id).then((foto) => {
+        const ust = $('.detay-kahraman', kok);
+        if (!foto || !ust || $('.detay-arka', ust)) return;
+        ust.style.setProperty('--ton', '#2a2420');
+        ust.insertAdjacentHTML('afterbegin', `<div class="detay-arka"><img class="detay-bulanik" src="${h(foto)}" alt=""/></div>`);
+      });
+    }
     $('#k-bildir', kok)?.addEventListener('click', () => sikayetSayfasi('kitap', k.id, k.ad));
     $('#k-y-kaldir', kok)?.addEventListener('click', async () => { if (await yoneticiKitapKaldir(k.id, k.ad)) geri(); });
     $('#k-y-aski', kok)?.addEventListener('click', () => yoneticiAskiDegistir(k.sahipId, k.sahipAd));

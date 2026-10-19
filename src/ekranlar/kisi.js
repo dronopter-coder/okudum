@@ -58,7 +58,7 @@ export function kisiEkrani(kok, { parca }) {
     const ciz2 = () => liste.map((y) => {
       const a = profilBilgisi(y.isteyenId);
       return `<li class="${y.teslim ? 'ulasti' : 'yolda'}" ${y.kitapId ? `data-git="kitap/${h(y.kitapId)}" data-kapat` : ''}>
-        <div class="gunluk-kapak">${kapak({ ad: y.kitapAd, yazar: y.kitapYazar || '', foto: y.kitapFoto }, 'mini')}</div>
+        <div class="gunluk-kapak">${kapak({ id: y.kitapId, ad: y.kitapAd, yazar: y.kitapYazar || '', foto: y.kitapFoto, fotoVar: y.kitapFotoVar }, 'mini')}</div>
         <div class="gunluk-bilgi">
           <b>${h(y.kitapAd)}</b>
           <span class="kisi-ok">${ikon('sag', 14)}${avatar(a.ad || 'Okur', a.foto, 20)}<span><b>${h(a.ad || 'Okur')}</b>${y.nereye ? ` · ${h(y.nereye)}` : ''}</span></span>
