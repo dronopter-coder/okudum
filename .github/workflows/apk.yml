@@ -40,6 +40,18 @@ jobs:
           open(p,'w').write(s)
           PY
           grep -n "background-runner" android/app/build.gradle
+      - name: Gereksiz konum izinlerini çıkar (arka plan eklentisi ekliyor; Okudum konum kullanmaz)
+        run: |
+          python3 - <<'PY'
+          p='android/app/src/main/AndroidManifest.xml'
+          s=open(p).read()
+          if 'xmlns:tools' not in s:
+              s=s.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android"', '<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools"', 1)
+          sil=''.join(f'<uses-permission android:name="android.permission.{i}" tools:node="remove"/>' for i in ['ACCESS_COARSE_LOCATION','ACCESS_FINE_LOCATION','ACCESS_BACKGROUND_LOCATION'])
+          s=s.replace('<application', sil + '\n    <application', 1)
+          open(p,'w').write(s)
+          PY
+          grep -c 'tools:node="remove"' android/app/src/main/AndroidManifest.xml
       - name: Firebase (google-services.json) ve Google girişi
         if: ${{ env.GOOGLE_SERVICES_JSON != '' }}
         run: |
