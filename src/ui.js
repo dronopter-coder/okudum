@@ -147,7 +147,7 @@ let toastZaman;
 // Ekranı yalnızca içerik gerçekten değiştiyse yeniden yaz (başka kullanıcıların işlemleriyle gelen
 // ilgisiz veri değişiklikleri sayfayı baştan çizip titretmesin). true → yazıldı.
 export function icerikYaz(kok, html) {
-  if (kok.__html === html) return false;
+  if (kok.__html === html && kok.firstChild) return false;
   kok.__html = html;
   kok.innerHTML = html;
   return true;

@@ -76,6 +76,7 @@ function rotala() {
   rotala.animZaman = setTimeout(() => sahne.classList.remove('giris-anim'), 700);
   sahne.scrollTop = 0;
   sahne.innerHTML = '';
+  sahne.__html = undefined; // aynı sekmeye yeniden basınca ekran boş kalmasın
   aktif = { ad, ornek: rota.ekran(sahne, { parca, sorgu }) || {} };
   void sahne.offsetWidth;
   sekmeCiz(rota.sekme);
