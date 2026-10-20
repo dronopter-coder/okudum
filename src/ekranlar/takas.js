@@ -1,7 +1,7 @@
 // Takas merkezi: gelen talepler (kitabımı isteyenler) ve giden talepler (benim isteklerim)
 import { durum, degisti } from '../durum.js';
 import { api } from '../veri/index.js';
-import { h, ikon, avatar, kapak, $, sayfaAc, toast, hataMetni, yukleniyor, onayla, titret, zamanOnce } from '../ui.js';
+import { h, ikon, avatar, kapak, $, sayfaAc, toast, hataMetni, yukleniyor, onayla, titret, zamanOnce, icerikYaz } from '../ui.js';
 import { TALEP_DURUM, KARGO_FIRMALARI } from '../sabitler.js';
 import { bosDurum, durumRozeti } from './ortak.js';
 import { gecisReklami } from '../reklam.js';
@@ -157,7 +157,7 @@ export function takasEkrani(kok, { sorgu }) {
     const bekleyenGelen = durum.gelen.filter((t) => t.durum === 'bekliyor').length;
     const kargodaGiden = durum.giden.filter((t) => t.durum === 'kargoda').length;
 
-    kok.innerHTML = `
+    const yeniHtml = `
       <header class="sayfa-bas"><h1>Takas</h1><p>Kitapların yolculuğunu buradan yönet.</p></header>
       <div class="sekme-anahtar" style="--i:${sekme === 'gelen' ? 0 : 1}">
         <i class="sekme-anahtar-kaydirici"></i>
@@ -172,6 +172,7 @@ export function takasEkrani(kok, { sorgu }) {
       ${biten.length ? `<button class="arsiv-dugme" id="t-arsiv">${arsiv ? 'Geçmişi gizle' : `Geçmiş takaslar (${biten.length})`} ${ikon('sag', 16)}</button>
         ${arsiv ? `<div class="talep-liste soluk">${biten.map((t) => kart(t, sekme)).join('')}</div>` : ''}` : ''}
     `;
+    if (!icerikYaz(kok, yeniHtml)) return; // görünür bir değişiklik yoksa ekrana dokunma
     guvenKartlariniDoldur(kok);
   };
 

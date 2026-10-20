@@ -1,6 +1,6 @@
 // Bir okurun sayfası: rafı ve gönderdiği kitaplar (kime hangi kitabı gönderdi)
 import { durum } from '../durum.js';
-import { h, ikon, avatar, kapak, sayfaAc, toast, zamanOnce, titret } from '../ui.js';
+import { h, ikon, avatar, kapak, sayfaAc, toast, zamanOnce, titret, icerikYaz } from '../ui.js';
 import { kitapKarti, bosDurum, ustBar } from './ortak.js';
 import { profilleriYukle, profilBilgisi } from './yildizlar.js';
 import { sikayetSayfasi, engelliMi, engelDegistir } from '../sikayet.js';
@@ -22,7 +22,7 @@ export function kisiEkrani(kok, { parca }) {
     const rafta = kitaplar.filter((k) => k.durum === 'musait');
     const gonderilen = gonderilenler();
 
-    kok.innerHTML = `
+    const yeniHtml = `
       ${ustBar('')}
       ${ad ? `<section class="kisi-bas">
         <div class="kisi-avatar">${avatar(ad, foto, 84)}</div>
@@ -44,6 +44,7 @@ export function kisiEkrani(kok, { parca }) {
         <button class="bildir-bag" id="ks-engel">${ikon('engel', 14)}<span>${engelliMi(uid) ? 'Engeli kaldır' : 'Engelle'}</span></button>
       </div>
       ${yoneticiCubugu(`<button class="dugme ${durum.askidakiler.has(uid) ? 'ikincil' : 'tehlike'} kucuk" id="ks-y-aski">${ikon('kalkan', 16)}<span>${durum.askidakiler.has(uid) ? 'Askıyı kaldır' : 'Hesabı askıya al'}</span></button>`)}` : ''}` : bosDurum('kisi', 'Okur bulunamadı', '')}`;
+    if (!icerikYaz(kok, yeniHtml)) return; // görünür bir değişiklik yoksa ekrana dokunma
     sahipPuaniYaz(uid, kok.querySelector('#ks-puan'));
     kok.querySelector('#ks-bildir')?.addEventListener('click', () => sikayetSayfasi('kisi', uid, ad));
     kok.querySelector('#ks-y-aski')?.addEventListener('click', async () => { if (await yoneticiAskiDegistir(uid, ad)) ciz(); });

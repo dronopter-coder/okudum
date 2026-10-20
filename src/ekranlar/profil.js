@@ -2,7 +2,7 @@
 import { sesAcikMi, sesAyarla, sesCal } from '../ses.js';
 import { durum } from '../durum.js';
 import { api, demoMu } from '../veri/index.js';
-import { h, ikon, avatar, kapak, $, sayfaAc, onayla, toast, hataMetni, titret, zamanOnce } from '../ui.js';
+import { h, ikon, avatar, kapak, $, sayfaAc, onayla, toast, hataMetni, titret, zamanOnce, icerikYaz } from '../ui.js';
 import { kitapKarti, bosDurum, LOGO_ISARET } from './ortak.js';
 import { git } from '../yon.js';
 
@@ -49,7 +49,7 @@ export function profilEkrani(kok) {
         : bosDurum('kitap', 'Henüz kitap almadın', 'Teslim aldığın kitaplar, kimden geldikleriyle burada görünür.', '<button class="dugme ana" data-git="kesfet">Kitap keşfet</button>');
     }
 
-    kok.innerHTML = `
+    const yeniHtml = `
     <section class="profil-kahraman">
       <div class="profil-desen" aria-hidden="true">${LOGO_ISARET}</div>
       <button class="profil-avatar" data-git="profil-duzenle" aria-label="Profil fotoğrafını değiştir">${avatar(p.ad, p.foto, 88)}<i class="foto-rozet">${ikon('kamera', 15, 2.2)}</i></button>
@@ -83,6 +83,7 @@ export function profilEkrani(kok) {
       <button id="p-cikis" class="tehlike">${ikon('cikis', 20)}<span>Çıkış yap</span></button>
     </section>
     <p class="surum">Okudum 1.0${demoMu ? ' · demo modu' : ''}<br/>${h(durum.kullanici.eposta || '')}</p>`;
+    if (!icerikYaz(kok, yeniHtml)) return; // görünür bir değişiklik yoksa ekrana dokunma
 
     kok.querySelectorAll('[data-b]').forEach((b) => b.addEventListener('click', () => { bolum = b.dataset.b; titret(); ciz(); }));
     $('#p-nasil', kok).addEventListener('click', nasilCalisir);

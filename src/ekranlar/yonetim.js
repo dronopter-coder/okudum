@@ -1,7 +1,7 @@
 // Yönetici paneli: şikâyetler, kitap kaldırma, hesap askıya alma (yalnızca yönetici hesabında görünür)
 import { durum, kitaplariSuz, degisti } from '../durum.js';
 import { api } from '../veri/index.js';
-import { h, ikon, avatar, kapak, onayla, toast, hataMetni, titret, zamanOnce } from '../ui.js';
+import { h, ikon, avatar, kapak, onayla, toast, hataMetni, titret, zamanOnce, icerikYaz } from '../ui.js';
 import { ustBar, bosDurum } from './ortak.js';
 import { profilleriYukle, profilBilgisi } from './yildizlar.js';
 import { SEBEPLER } from '../sikayet.js';
@@ -117,7 +117,7 @@ export function yonetimEkrani(kok) {
         : bosDurum('tik', sekme === 'acik' ? 'Açık şikâyet yok' : 'İncelenen şikâyet yok', sekme === 'acik' ? 'Her şey yolunda görünüyor. 🎉' : '');
     }
     const sekmeler = [['acik', 'Açık', acik.length], ['incelenen', 'İncelenen', incelenen.length], ['askida', 'Askıdakiler', askida.length]];
-    kok.innerHTML = `
+    const yeniHtml = `
       ${ustBar('Yönetici paneli')}
       <div class="yn-ozet">
         <div><b>${acik.length}</b><span>açık şikâyet</span></div>
@@ -126,6 +126,7 @@ export function yonetimEkrani(kok) {
       </div>
       <div class="yn-sekmeler">${sekmeler.map(([k, a, n]) => `<button data-s="${k}" class="${sekme === k ? 'secili' : ''}">${a}${n ? ` <em>${n}</em>` : ''}</button>`).join('')}</div>
       <div class="yn-icerik">${icerik}</div>`;
+    if (!icerikYaz(kok, yeniHtml)) return;
     // Görünen kişilerin adlarını getir
     const uidler = [...sikayetler.flatMap((s) => [s.verenId, s.hedefTur === 'kisi' ? s.hedefId : null]), ...askida].filter(Boolean);
     profilleriYukle(uidler).then((degisti) => { if (degisti && kok.isConnected) ciz(); });

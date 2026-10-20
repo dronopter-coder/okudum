@@ -1,6 +1,6 @@
 // Haftanın yolculukları: bu hafta kargoya verilen kitapların şehirden şehre rotası (animasyonlu harita + infografik)
 import { durum } from '../durum.js';
-import { h, ikon, kapak, zamanOnce } from '../ui.js';
+import { h, ikon, kapak, zamanOnce, icerikYaz } from '../ui.js';
 import { ILLER, haritaSvg, mesafeKm, yay } from '../haritaCekirdek.js';
 import { ustBar, bosDurum } from './ortak.js';
 
@@ -73,7 +73,7 @@ export function yolculuklarEkrani(kok, { sorgu = {} } = {}) {
     // İstanbul–Ankara ≈ 350 km
     const benzetme = o.km >= 700 ? `İstanbul ile Ankara arasını <b>${sayi(Math.round(o.km / 700))}</b> kez gidip gelmek kadar.` : '';
 
-    kok.innerHTML = `
+    const yeniHtml = `
       ${ustBar('Haftanın yolculukları')}
       <section class="yolculuk-kahraman" ${o.adet ? 'data-gunluk' : ''}>
         <div class="yk-bas"><span class="kucuk-etiket acik">${ikon('rota', 13)} ${tarih}</span>
@@ -125,6 +125,7 @@ export function yolculuklarEkrani(kok, { sorgu = {} } = {}) {
         </ol>
       </section>`
     : bosDurum('rota', 'Henüz yola çıkan kitap yok', 'Bir kitap kargoya verildiğinde rotası burada canlanır. İlk yolculuğu sen başlat!', '<button class="dugme ana" data-git="ekle">Kitap ekle</button>')}`;
+    if (!icerikYaz(kok, yeniHtml)) return; // görünür bir değişiklik yoksa ekrana dokunma
 
     sayilariCanlandir(kok);
   };

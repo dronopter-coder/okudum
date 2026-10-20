@@ -1,6 +1,6 @@
 // Arama: metin, kategori ve şehir filtresi
 import { durum } from '../durum.js';
-import { h, ikon, $, $$ } from '../ui.js';
+import { h, ikon, $, $$, icerikYaz } from '../ui.js';
 import { KATEGORILER, ILLER } from '../sabitler.js';
 import { kitapKarti, bosDurum } from './ortak.js';
 
@@ -28,9 +28,9 @@ export function araEkrani(kok, { sorgu }) {
       && (!f.sehir || k.sehir === f.sehir)
       && (!m || kucuk(`${k.ad} ${k.yazar} ${k.kategori}`).includes(m)));
     $$('#a-kat .cip', kok).forEach((c) => c.classList.toggle('secili', c.dataset.kat === f.kategori));
-    $('#a-sonuc', kok).innerHTML = liste.length
+    icerikYaz($('#a-sonuc', kok), liste.length
       ? `<p class="sonuc-sayi">${liste.length} kitap bulundu</p><div class="izgara">${liste.map((k) => kitapKarti(k)).join('')}</div>`
-      : bosDurum('ara', 'Bulunamadı', 'Aradığın kitap henüz kimsenin rafında yok. Biraz sonra tekrar bak — raflar her gün yenileniyor.');
+      : bosDurum('ara', 'Bulunamadı', 'Aradığın kitap henüz kimsenin rafında yok. Biraz sonra tekrar bak — raflar her gün yenileniyor.'));
   };
 
   $('#a-metin', kok).addEventListener('input', (e) => { f.metin = e.target.value; sonucCiz(); });

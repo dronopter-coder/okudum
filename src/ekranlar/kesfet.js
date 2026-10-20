@@ -1,7 +1,7 @@
 // Ana ekran: selamlama, arama, kategoriler, yeni gelenler, şehrindekiler ve tüm raf
 import { durum } from '../durum.js';
 import { demoMu } from '../veri/index.js';
-import { h, ikon, avatar, kapak, $ } from '../ui.js';
+import { h, ikon, avatar, kapak, $, icerikYaz } from '../ui.js';
 import { KATEGORILER } from '../sabitler.js';
 import { kitapKarti, bosDurum, iskelet, logo, bulunma, rafSusu, SARMASIK } from './ortak.js';
 import { haftaninYolculuklari, ozet, rotaHaritasi } from './yolculuklar.js';
@@ -25,7 +25,7 @@ export function kesfetEkrani(kok) {
     const sehrim = musait.filter((k) => k.sehir && k.sehir === p?.sehir).slice(0, 10);
     const yolda = durum.kitaplar.filter((k) => k.durum === 'verildi').length;
 
-    kok.innerHTML = `
+    const yeniHtml = `
     <header class="kesfet-ust">
       <a class="logo-bag" data-git="yolculuklar" aria-label="Haftanın yolculukları">${logo()}</a>
       <div class="ust-sag">
@@ -74,6 +74,7 @@ export function kesfetEkrani(kok) {
       <div class="izgara">${musait.map((k) => kitapKarti(k)).join('')}</div>
     </section>`}
     `;
+    if (!icerikYaz(kok, yeniHtml)) return; // görünür bir değişiklik yoksa ekrana dokunma
   };
   ciz();
   yildizKartiniYenile(kok);

@@ -192,8 +192,12 @@ export function haritaEkrani(kok) {
   return {
     guncelle(neler) {
       if (neler !== 'kitaplar') return;
+      // Haritada görünen (şehir → kitaplar) değişmediyse haritayı baştan kurma
+      const yeni = veri();
+      const imza = (m) => [...m.entries()].map(([a, l]) => `${a}:${l.map((k) => k.id + k.ad).join(',')}`).sort().join('|');
+      if (imza(yeni) === imza(sehirler)) return;
       const d = kontrol ? { ...kontrol.durum } : null;
-      sehirler = veri();
+      sehirler = yeni;
       kur();
       if (d && d.k > 1) kontrol.ayarla(d);
     },

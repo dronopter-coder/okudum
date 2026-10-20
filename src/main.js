@@ -71,6 +71,9 @@ function rotala() {
   aktif?.ornek?.temizle?.();
   const sahne = $('#sahne');
   sahne.className = 'sahne giris-anim' + (rota.sekme ? ' sekmeli' : '') + (rota.tamEkran ? ' tam-ekran' : '');
+  // Açılış animasyonu yalnızca sayfaya ilk girerken: veri güncellemelerinde yeniden oynayıp ekranı titretmesin
+  clearTimeout(rotala.animZaman);
+  rotala.animZaman = setTimeout(() => sahne.classList.remove('giris-anim'), 700);
   sahne.scrollTop = 0;
   sahne.innerHTML = '';
   aktif = { ad, ornek: rota.ekran(sahne, { parca, sorgu }) || {} };

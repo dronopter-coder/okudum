@@ -1,7 +1,7 @@
 // Ayın yıldızları: en çok kitap gönderen okurların sıralaması (ilk 10) + Keşfet'teki özet kartı
 import { durum } from '../durum.js';
 import { api } from '../veri/index.js';
-import { h, ikon, avatar } from '../ui.js';
+import { h, ikon, avatar, icerikYaz } from '../ui.js';
 import { ustBar, bosDurum } from './ortak.js';
 
 // Sıralama, herkese açık yolculuk kayıtlarından (son 500 gönderim) hesaplanır: her kayıt bir gönderimdir.
@@ -83,7 +83,7 @@ export function yildizlarEkrani(kok) {
     const enCok = lider?.adet || 1;
     const kicker = donem === 'ay' ? `${ayAdi()} · Ayın yıldızı` : 'Tüm zamanlar · Zirvedeki okur';
 
-    kok.innerHTML = `
+    const yeniHtml = `
       ${ustBar('Ayın yıldızları')}
       <section class="yildiz-kahraman">
         <div class="yk-yildizlar" aria-hidden="true">${Array.from({ length: 12 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div>
@@ -120,6 +120,7 @@ export function yildizlarEkrani(kok) {
       ${benimSira < 0 ? `<div class="benim-sira"><span class="sira-no">${ikon('yildiz', 16)}</span>${avatar(durum.profil.ad, durum.profil.foto, 40)}<div><b>Sen de listeye girebilirsin</b><span>Bir kitabı kargoya ver, ilk 10'a adım at.</span></div></div>` : ''}
       <p class="ys-not">${ikon('bilgi', 14)} Sıralama, yeni okuruna ulaşan (teslim alınan) kitap sayısına göre hesaplanır. Aynı okura ayda bir gönderim sayılır; her ayın başında sıfırlanır.</p>`
     : bosDurum('kupa', 'Liste henüz boş', 'Kargoya verilen ilk kitap, gönderenini zirveye taşır.')}`;
+    if (!icerikYaz(kok, yeniHtml)) return; // görünür bir değişiklik yoksa ekrana dokunma
 
     kok.querySelectorAll('[data-d]').forEach((b) => b.addEventListener('click', () => { donem = b.dataset.d; ciz(); yukle(); }));
   };
